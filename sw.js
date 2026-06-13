@@ -1,5 +1,5 @@
 // 深海ステーション物語 Service Worker:アプリシェルをキャッシュして完全オフライン対応
-const VER = 'shinkai-v2';
+const VER = 'shinkai-v3';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 self.addEventListener('install', e=>{
   e.waitUntil(caches.open(VER).then(c=>c.addAll(SHELL)).then(()=>self.skipWaiting()));

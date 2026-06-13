@@ -2608,6 +2608,7 @@ function saveData(){
   };
 }
 function applySave(d){
+  const awaySec = (d.t ? Math.min((Date.now()-d.t)/1000, 8*3600) : 0);   // るす時間(最大8時間)…探索を進める
   S.g=d.g||0; S.r=d.r||0; S.parts=d.parts||0; S.tickets=d.tickets||0; S.crewCap=d.crewCap||4;
   S.life=d.life||{exp:0,gacha:0,earn:0}; S.ach=d.ach||{}; S.login=d.login||{last:'',day:0};
   S.zoneUnlocked=d.zoneUnlocked||1; S.dex=d.dex||{};
@@ -2639,7 +2640,7 @@ function applySave(d){
   S.wkc = (d.wkc && d.wkc.key) ? d.wkc : {key:null, n:0, done:false};
   S.freeWarp = (d.freeWarp && d.freeWarp.key) ? d.freeWarp : {key:null, used:false};
   S.warpN = (d.warpN && d.warpN.key) ? d.warpN : {key:null, n:[0,0,0,0,0]};
-  S.abyssExp = d.abyssExp ? {dur:d.abyssExp.dur, t0:Date.now()-(d.abyssExp.dur-d.abyssExp.rem)*1000, pid:(d.abyssExp.pi>=0 && S.crew[d.abyssExp.pi])?S.crew[d.abyssExp.pi].id:undefined} : null;
+  S.abyssExp = d.abyssExp ? {dur:d.abyssExp.dur, t0:Date.now()-(d.abyssExp.dur-d.abyssExp.rem)*1000 - awaySec*1000, pid:(d.abyssExp.pi>=0 && S.crew[d.abyssExp.pi])?S.crew[d.abyssExp.pi].id:undefined} : null;
   if(d.vol!==undefined){ audio.vol=+d.vol; $('volSlider').value=audio.vol; $('volVal').textContent=audio.vol+'%'; applyVol(); }
   S.bigFont = !!d.bigFont; applyFont();
   $('fontBtn').textContent='文字サイズ：'+(S.bigFont?'大きめ':'標準');
@@ -2647,8 +2648,8 @@ function applySave(d){
   S.items = d.items||{};
   const bb=d.buffs||{};
   S.buffs = {speed:Date.now()+(bb.speed||0)*1000, gold:Date.now()+(bb.gold||0)*1000, luck2:Date.now()+(bb.luck2||0)*1000};
-  S.exps = (d.exps||[]).map(e=>({zone:e.zone, dur:e.dur, t0: Date.now()-(e.dur-e.rem)*1000, pid:(e.pi>=0 && S.crew[e.pi]) ? S.crew[e.pi].id : undefined}));
-  if(d.exp) S.exps.push({zone:d.exp.zone, dur:d.exp.dur, t0: Date.now()-(d.exp.dur-d.exp.rem)*1000});  // 旧形式互換
+  S.exps = (d.exps||[]).map(e=>({zone:e.zone, dur:e.dur, t0: Date.now()-(e.dur-e.rem)*1000 - awaySec*1000, pid:(e.pi>=0 && S.crew[e.pi]) ? S.crew[e.pi].id : undefined}));
+  if(d.exp) S.exps.push({zone:d.exp.zone, dur:d.exp.dur, t0: Date.now()-(d.exp.dur-d.exp.rem)*1000 - awaySec*1000});  // 旧形式互換
   if(d.mis && d.mis.d && d.mis.w){ S.mis = d.mis; misReset(); }
   asgDirty=true;
 }
