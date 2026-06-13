@@ -1,0 +1,3589 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#020610">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="深海ST">
+<title>深海ステーション物語</title>
+<link href="https://fonts.googleapis.com/css2?family=DotGothic16&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { height:100%; overflow:hidden; background:#020610; overscroll-behavior:none; }
+  body { position:fixed; inset:0; width:100%; touch-action:none; }
+  body { font-family:'DotGothic16', monospace; color:#cfe8ff; user-select:none; }
+  #wrap { position:relative; width:100%; height:100%; max-width:520px; margin:0 auto; overflow:hidden; }
+  canvas { display:block; width:100%; height:100%; image-rendering:pixelated; image-rendering:crisp-edges; touch-action:none; }
+
+  /* ---------- HUD ---------- */
+  #hud {
+    position:absolute; top:0; left:0; right:0; display:flex; gap:4px;
+    padding:6px; pointer-events:none; z-index:10;
+  }
+  .stat {
+    background:#06101ecc; border:2px solid #1d3a5f; padding:3px 8px;
+    font-size:13px; line-height:1.2; box-shadow:0 2px 0 #00000088;
+  }
+  .stat b { color:#ffd97a; }
+  .stat .lbl { color:#6fa3d0; font-size:10px; display:block; }
+  #depthTag {
+    position:absolute; right:6px; top:64px; z-index:10; pointer-events:none;
+    background:#06101ecc; border:2px solid #1d3a5f; padding:2px 8px; font-size:12px; color:#7fe7d4;
+  }
+
+  /* ---------- bottom nav ---------- */
+  #nav {
+    position:absolute; bottom:0; left:0; right:0; display:flex; gap:6px;
+    padding:8px; z-index:10; justify-content:center;
+  }
+  .navBtn {
+    flex:1; max-width:110px; background:#0c2238; border:2px solid #2d5c8f;
+    border-bottom:4px solid #16344f; color:#cfe8ff; font-family:inherit;
+    font-size:13px; padding:9px 2px 7px; cursor:pointer; position:relative;
+  }
+  .navBtn:active { transform:translateY(2px); border-bottom-width:2px; }
+  .navBtn .badge {
+    position:absolute; top:-7px; right:-4px; background:#ff6e9c; color:#1a0410;
+    font-size:11px; padding:0 5px; border:2px solid #ffd1e0; display:none;
+  }
+
+  /* ---------- panels ---------- */
+  .panel {
+    position:absolute; left:50%; transform:translateX(-50%);
+    bottom:0; width:100%; max-width:520px; max-height:72%;
+    background:#081627; border:3px solid #2d5c8f; border-bottom:none;
+    z-index:20; display:none; flex-direction:column;
+  }
+  .panel.open { display:flex; }
+  .pTitle {
+    background:#11304f; padding:8px 12px; font-size:16px; color:#9fdcff;
+    display:flex; justify-content:space-between; align-items:center;
+    border-bottom:2px solid #2d5c8f;
+  }
+  .pClose { background:none; border:none; color:#ffd97a; font-family:inherit; font-size:15px; cursor:pointer; padding:2px 8px; }
+  .pBody { overflow-y:auto; padding:10px; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; touch-action:pan-y; }
+
+  .item {
+    display:flex; gap:10px; align-items:center; background:#0c2238;
+    border:2px solid #1d3a5f; padding:8px; margin-bottom:8px;
+  }
+  .item .ic { width:44px; height:44px; flex:none; image-rendering:pixelated; }
+  .item .tx { flex:1; font-size:13px; line-height:1.45; }
+  .item .tx b { color:#9fdcff; font-size:14px; }
+  .item .tx small { color:#6fa3d0; display:block; }
+  .buyBtn {
+    background:#1d4d3a; border:2px solid #3fa37a; border-bottom:4px solid #14352a;
+    color:#bdffd9; font-family:inherit; font-size:13px; padding:7px 10px 5px; cursor:pointer; flex:none;
+  }
+  .buyBtn:disabled { background:#1a2533; border-color:#2c3c52; color:#56708f; }
+  .buyBtn:active:not(:disabled) { transform:translateY(2px); border-bottom-width:2px; }
+  .buyBtn.gold { background:#4d3c14; border-color:#b08a2e; color:#ffe6a3; }
+
+  /* ---------- dex grid ---------- */
+  #dexGrid { display:grid; grid-template-columns:repeat(auto-fill,minmax(100px,1fr)); gap:8px; }
+  .dexCard {
+    background:#0c2238; border:2px solid #1d3a5f; padding:6px; text-align:center; cursor:pointer;
+  }
+  .dexCard canvas { width:56px; height:42px; image-rendering:pixelated; }
+  .dexCard .nm { font-size:11px; margin-top:2px; color:#cfe8ff; }
+  .dexCard.locked { opacity:.85; }
+  .dexCard.locked .nm { color:#3f5c7e; }
+  .dexCard .rar { font-size:10px; color:#ffd97a; }
+
+  /* ---------- toast ---------- */
+  #toasts { position:absolute; top:70px; left:0; right:0; z-index:30; display:flex; flex-direction:column; align-items:center; gap:5px; pointer-events:none; }
+  .toast {
+    background:#06101ee6; border:2px solid #3fa37a; color:#bdffd9;
+    padding:5px 14px; font-size:13px; animation:tIn .25s steps(4);
+  }
+  .toast.warn { border-color:#ff6e9c; color:#ffd1e0; }
+  @keyframes tIn { from { transform:translateY(-12px); opacity:0; } }
+
+  /* ---------- discovery modal ---------- */
+
+  /* ----- メニューのタブ ----- */
+  .mtabBar{ display:flex; gap:4px; padding:6px 8px 0; background:#081627; border-bottom:2px solid #1d3a5f; }
+  .mtab{
+    flex:1; background:#0c2238; border:2px solid #1d3a5f; border-bottom:none;
+    color:#6fa3d0; font-family:inherit; font-size:11px; padding:6px 2px 4px; cursor:pointer;
+  }
+  .mtab.on{ background:#13335a; color:#9fdcff; border-color:#3fa37a; }
+  .mtabPage{ display:none; }
+  .mtabPage.on{ display:block; }
+  body.bigfont .mtab{ font-size:13px; }
+
+  /* ----- アクセシビリティ ----- */
+  .rnum{ font-size:9px; color:#8fa8c0; margin-left:2px; vertical-align:1px; }
+  #volRow{ display:flex; align-items:center; gap:8px; justify-content:center; margin-top:6px; }
+  #volSlider{ width:140px; accent-color:#3fa37a; }
+  body.bigfont .pBody{ font-size:15px; }
+  body.bigfont .item .tx b{ font-size:15px; }
+  body.bigfont .item .tx small, body.bigfont .item small{ font-size:13px; }
+  body.bigfont .toast{ font-size:15px; }
+  body.bigfont #tutBox{ font-size:14px; max-width:330px; }
+  body.bigfont .navBtn{ font-size:14px; }
+  body.bigfont #hud .stat{ font-size:14px; }
+  body.bigfont .dexCard .dn{ font-size:13px; }
+  body.bigfont .rnum{ font-size:11px; }
+  body.bigfont #guestReport, body.bigfont #journal, body.bigfont #presInfo, body.bigfont #relicShop{ font-size:14px; }
+
+  /* ----- ヌシ釣り ----- */
+  #nushiModal{
+    display:none; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); z-index:30;
+    background:#081627; border:3px solid #ffd97a; padding:14px; width:min(86%, 300px); text-align:center;
+    box-shadow:0 0 24px rgba(255,217,122,.3); animation:pop .25s steps(4);
+  }
+  #nushiModal.open{ display:block; }
+  #nushiModal h2{ font-size:14px; color:#ffd97a; margin:0 0 8px; }
+
+  /* ----- チュートリアル ----- */
+  #tutBox{
+    position:absolute; left:50%; transform:translateX(-50%); bottom:64px; z-index:14;
+    background:#081627ee; border:2px solid #ffd97a; color:#ffe6a3;
+    font-size:12px; line-height:1.7; padding:8px 12px; max-width:300px; width:max-content;
+    display:none; pointer-events:none; box-shadow:0 0 12px rgba(255,217,122,.25);
+  }
+  #tutBox .tStep{ color:#9fdcff; font-size:10px; }
+  #tutSkip{ pointer-events:auto; position:absolute; top:2px; right:4px; background:none; border:none; color:#6fa3d0; font-family:inherit; font-size:10px; cursor:pointer; }
+  .tutGlow{ animation:tutPulse .8s ease-in-out infinite alternate; }
+  @keyframes tutPulse{ from{ box-shadow:0 0 2px #ffd97a; border-color:#ffd97a; } to{ box-shadow:0 0 12px #ffd97a; border-color:#fff3b0; } }
+
+  /* ----- レア度別の発見演出 ----- */
+  #discBox{position:relative; overflow:hidden;}
+  .fxEl{pointer-events:none;}
+  .discRays{position:absolute; left:50%; top:42%; width:340px; height:340px; margin-left:-170px; margin-top:-170px;
+    background:conic-gradient(from 0deg,
+      var(--rayc) 0deg 10deg, transparent 10deg 30deg,
+      var(--rayc) 30deg 40deg, transparent 40deg 60deg,
+      var(--rayc) 60deg 70deg, transparent 70deg 90deg,
+      var(--rayc) 90deg 100deg, transparent 100deg 120deg,
+      var(--rayc) 120deg 130deg, transparent 130deg 150deg,
+      var(--rayc) 150deg 160deg, transparent 160deg 180deg,
+      var(--rayc) 180deg 190deg, transparent 190deg 210deg,
+      var(--rayc) 210deg 220deg, transparent 220deg 240deg,
+      var(--rayc) 240deg 250deg, transparent 250deg 270deg,
+      var(--rayc) 270deg 280deg, transparent 280deg 300deg,
+      var(--rayc) 300deg 310deg, transparent 310deg 330deg,
+      var(--rayc) 330deg 340deg, transparent 340deg 360deg);
+    animation:discSpin 6s linear infinite; z-index:0;}
+  .discRays.rainbow{filter:hue-rotate(0deg); animation:discSpin 4s linear infinite, hueSpin 2.4s linear infinite;}
+  @keyframes discSpin{to{transform:rotate(360deg)}}
+  @keyframes hueSpin{to{filter:hue-rotate(360deg)}}
+  #discBox > *:not(.fxEl){position:relative; z-index:1;}
+  .sparkP{position:absolute; font-size:11px; animation:sparkUp 1.3s ease-out forwards; z-index:2;}
+  @keyframes sparkUp{0%{opacity:0; transform:translateY(4px) scale(.5);}25%{opacity:1;}100%{opacity:0; transform:translateY(-26px) scale(1.5);}}
+  .confettiP{position:absolute; width:5px; height:9px; top:-12px; animation:confFall linear forwards; z-index:2;}
+  @keyframes confFall{to{transform:translateY(190px) rotate(740deg); opacity:0;}}
+  .flashFx{position:fixed; inset:0; background:#fff; pointer-events:none; animation:flashOut .55s ease-out forwards; z-index:99;}
+  @keyframes flashOut{from{opacity:.9}to{opacity:0}}
+  .r4title{text-shadow:0 0 8px #c77ddb;}
+  .r5title{animation:r5pulse .55s ease-in-out infinite alternate;}
+  @keyframes r5pulse{from{transform:scale(1); text-shadow:0 0 4px #ffd97a;}to{transform:scale(1.1); text-shadow:0 0 16px #ffd97a, 0 0 30px #ffae3d;}}
+  @keyframes boxShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-4px)}40%{transform:translateX(4px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+  .r5box{animation:boxShake .45s ease-in-out 1;}
+
+  #discover {
+    position:absolute; inset:0; background:#020610d9; z-index:40;
+    display:none; align-items:center; justify-content:center; flex-direction:column; gap:12px;
+  }
+  #discover.open { display:flex; }
+  #discBox {
+    background:#081627; border:3px solid #ffd97a; padding:18px 26px; text-align:center;
+    animation:pop .3s steps(5);
+  }
+  @keyframes pop { from { transform:scale(.6); } }
+  #discBox h2 { color:#ffd97a; font-size:17px; margin-bottom:10px; font-weight:normal; }
+  #discBox canvas { width:96px; height:72px; image-rendering:pixelated; }
+  #discBox .dn { font-size:18px; color:#9fdcff; margin-top:8px; }
+  #discBox .dd { font-size:12px; color:#8fb6da; margin-top:6px; max-width:230px; line-height:1.5; }
+  #discBox .dr { font-size:12px; color:#ffd97a; margin-top:4px; }
+  #discOk {
+    background:#1d4d3a; border:2px solid #3fa37a; border-bottom:4px solid #14352a;
+    color:#bdffd9; font-family:inherit; font-size:15px; padding:9px 30px 7px; cursor:pointer;
+  }
+
+  /* ---------- intro ---------- */
+  #intro {
+    position:absolute; inset:0; background:#020610; z-index:50;
+    display:flex; align-items:center; justify-content:center; flex-direction:column; gap:16px; text-align:center; padding:20px;
+  }
+  #intro h1 { color:#7fe7d4; font-size:26px; font-weight:normal; letter-spacing:2px; text-shadow:0 0 12px #1d6e5e; }
+  #intro p { font-size:13px; color:#8fb6da; line-height:1.9; max-width:300px; }
+  #startBtn {
+    background:#0c2238; border:2px solid #7fe7d4; border-bottom:4px solid #16344f;
+    color:#7fe7d4; font-family:inherit; font-size:17px; padding:11px 38px 9px; cursor:pointer;
+  }
+
+  /* ---------- crew & gacha ---------- */
+  #gachaBox { background:#11304f; border:2px solid #b08a2e; padding:12px; margin-bottom:10px; text-align:center; }
+  #gachaBox .rates { font-size:10px; color:#6fa3d0; margin-top:7px; line-height:1.7; }
+  .crewCard { display:flex; gap:10px; align-items:center; background:#0c2238; border:2px solid #1d3a5f; padding:8px; margin-bottom:8px; }
+  .crewCard canvas { width:40px; height:48px; image-rendering:pixelated; flex:none; background:#091523; }
+  .crewCard .ct { flex:1; font-size:12px; line-height:1.55; }
+  .crewCard .ct b { font-size:13px; }
+  .crewCard .job { color:#7fe7d4; font-size:11px; }
+  .bar { display:inline-block; width:50px; height:6px; background:#091523; border:1px solid #1d3a5f; vertical-align:middle; margin:0 4px 1px; }
+  .bar i { display:block; height:100%; background:#7fe7d4; }
+  .byeBtn { background:#3a1d2a; border:2px solid #8f2d54; color:#ffb8cf; font-family:inherit; font-size:11px; padding:5px 7px; cursor:pointer; flex:none; }
+  .gbtn {
+    background:#4d3c14; border:2px solid #ffd97a; border-bottom:4px solid #2e2408;
+    color:#ffe6a3; font-family:inherit; font-size:14px; padding:9px 16px 7px; cursor:pointer; margin:0 3px;
+  }
+  .gbtn:disabled { opacity:.45; }
+  .gbtn:active:not(:disabled){ transform:translateY(2px); border-bottom-width:2px; }
+
+  /* ---------- skill cut-in ---------- */
+  #cutin {
+    position:absolute; top:96px; left:0; right:0; z-index:35; display:flex; justify-content:center;
+    pointer-events:none; transform:translateX(-115%); transition:transform .22s steps(5);
+  }
+  #cutin.show { transform:translateX(0); }
+  #cutin .inner {
+    background:#06101ef2; border:2px solid #ffd97a; box-shadow:0 0 14px #b08a2e66;
+    padding:6px 14px; display:flex; gap:9px; align-items:center; font-size:13px;
+  }
+  #cutin canvas { width:30px; height:36px; image-rendering:pixelated; }
+
+  /* ---------- event tag / sound ---------- */
+  #evTag {
+    position:absolute; right:6px; top:92px; z-index:10; pointer-events:none; display:none;
+    background:#06101ecc; border:2px solid #1d3a5f; padding:2px 8px; font-size:12px;
+  }
+  #sndBtn {
+    display:block; margin:6px auto 0; min-width:170px;
+    background:#1d4d3a; border:2px solid #3fa37a; border-bottom:4px solid #14352a;
+    color:#bdffd9; font-family:inherit; font-size:13px; padding:7px 14px 5px; cursor:pointer;
+  }
+
+  /* ---------- 10-pull result ---------- */
+  #gachaMulti { display:none; background:#081627; border:3px solid #ffd97a; padding:14px; max-width:340px; text-align:center; animation:pop .3s steps(5); }
+  #gachaMulti.show { display:block; }
+  #gmGrid { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin:8px 0; }
+  .gmCell { background:#0c2238; border:2px solid #1d3a5f; padding:3px 2px; font-size:9px; line-height:1.4; }
+  .gmCell canvas { width:20px; height:24px; image-rendering:pixelated; }
+
+  /* ---------- offline reward ---------- */
+  #offModal { position:absolute; inset:0; background:#020610d9; z-index:48; display:none; align-items:center; justify-content:center; }
+  #offModal.open { display:flex; }
+  #offBox { background:#081627; border:3px solid #7fe7d4; padding:20px 28px; text-align:center; animation:pop .3s steps(5); }
+  #offBox h2 { color:#7fe7d4; font-size:17px; font-weight:normal; margin-bottom:10px; }
+  #offBox .tx { font-size:13px; color:#cfe8ff; line-height:2; }
+
+  #saveTa {
+    width:100%; margin-top:6px; background:#04101d; color:#7fe7d4; border:2px solid #1d3a5f;
+    font-family:monospace; font-size:10px; padding:5px; resize:vertical; box-sizing:border-box;
+  }
+  #gachaModal { position:absolute; inset:0; background:#020610e0; z-index:45; display:none; align-items:center; justify-content:center; }
+  #gachaModal.open { display:flex; }
+  #gachaAnimC {
+    display:none; background:#04101d; border:3px solid #2d5c8f;
+    width:min(290px, 82vw); image-rendering:pixelated; cursor:pointer;
+  }
+  #gachaCard { background:#081627; border:3px solid #ffd97a; padding:18px 26px; text-align:center; animation:pop .35s steps(6); }
+  #gachaCard.legend { animation:legendGlow .9s steps(4) infinite; }
+  @keyframes legendGlow {
+    0%,100% { border-color:#ffd97a; box-shadow:0 0 16px #b08a2e; }
+    50%     { border-color:#fff3c0; box-shadow:0 0 34px #ffd97a; }
+  }
+  #gachaCard canvas { width:80px; height:96px; image-rendering:pixelated; }
+  #gachaCard .gn { font-size:17px; color:#9fdcff; margin-top:6px; }
+  #gachaCard .gs { font-size:20px; margin:2px 0 6px; letter-spacing:2px; }
+  #gachaCard .gs span { opacity:0; display:inline-block; transform:scale(2.4); animation:starPop .28s steps(3) forwards; }
+  @keyframes starPop { to { opacity:1; transform:scale(1); } }
+  #gachaCard .gk { font-size:12px; color:#ffd97a; }
+  #gachaCard .gst { font-size:12px; color:#8fb6da; line-height:1.8; margin-top:8px; }
+  #gachaOk {
+    margin-top:14px; background:#1d4d3a; border:2px solid #3fa37a; border-bottom:4px solid #14352a;
+    color:#bdffd9; font-family:inherit; font-size:15px; padding:8px 28px 6px; cursor:pointer;
+  }
+
+  /* ---------- skill cut-in ---------- */
+  #cutin { position:absolute; top:26%; left:0; right:0; z-index:36; pointer-events:none; display:none; --cc:#7fe7d4; }
+  #cutin.show { display:block; animation:cutSlide 2.5s steps(30) forwards; }
+  #cutin .cutInner {
+    background:#081627ee; border-top:2px solid var(--cc); border-bottom:2px solid var(--cc);
+    padding:8px 16px; display:flex; gap:12px; align-items:center; box-shadow:0 0 18px #00000088;
+  }
+  #cutin canvas { width:40px; height:48px; image-rendering:pixelated; }
+  #cutin .cutTx { font-size:13px; line-height:1.5; }
+  #cutin #cutSkill { color:var(--cc); font-size:15px; }
+  #cutin #cutFx { color:#ffd97a; font-size:12px; }
+  @keyframes cutSlide {
+    0% { transform:translateX(110%); } 14% { transform:translateX(0); }
+    82% { transform:translateX(0); } 100% { transform:translateX(-115%); }
+  }
+
+  /* ---------- event banner ---------- */
+  #evBanner {
+    position:absolute; top:48px; left:50%; transform:translateX(-50%); z-index:11;
+    background:#2a0f1add; border:2px solid #ff6e9c; color:#ffd1e0;
+    font-size:12px; padding:3px 10px; display:none; pointer-events:none; white-space:nowrap;
+  }
+  #buffBar {
+    position:absolute; top:96px; right:6px; z-index:11;
+    background:#0a2a1edd; border:2px solid #3fa37a; color:#bdffd9;
+    font-size:12px; padding:2px 10px; display:none; pointer-events:none; white-space:nowrap;
+  }
+
+  /* ---------- 10連 result & away modal ---------- */
+  #multiModal, #awayModal { position:absolute; inset:0; background:#020610e0; z-index:46; display:none; align-items:center; justify-content:center; }
+  #multiModal.open, #awayModal.open { display:flex; }
+  #multiBox { background:#081627; border:3px solid #ffd97a; padding:14px; width:min(340px,90vw); text-align:center; animation:pop .3s steps(5); }
+  #multiGrid { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin:10px 0; }
+  .mCard { background:#0c2238; border:2px solid #1d3a5f; padding:4px 2px; font-size:9px; line-height:1.35; }
+  .mCard canvas { width:24px; height:28px; image-rendering:pixelated; }
+  .mCard.sold { opacity:.45; }
+  #awayBox { background:#081627; border:3px solid #7fe7d4; padding:18px 26px; text-align:center; animation:pop .3s steps(5); font-size:13px; line-height:2; }
+  #awayBox h2 { color:#7fe7d4; font-size:17px; font-weight:normal; margin-bottom:8px; }
+  .gachaBtn {
+    background:#4d3c14; border:2px solid #ffd97a; border-bottom:4px solid #2e2408;
+    color:#ffe6a3; font-family:inherit; font-size:14px; padding:9px 14px 7px; cursor:pointer;
+  }
+  .gachaBtn:disabled { opacity:.45; }
+  .gachaBtn:active:not(:disabled){ transform:translateY(2px); border-bottom-width:2px; }
+  #saveTa { width:100%; height:54px; background:#091523; color:#9fdcff; border:1px solid #1d3a5f; font-family:inherit; font-size:10px; margin:6px 0; }
+
+  /* ---------- missions ---------- */
+  .misHead { font-size:14px; color:#ffe6a3; margin:4px 0 6px; display:flex; justify-content:space-between; align-items:baseline; }
+  .misHead small { color:#6fa3d0; font-size:10px; }
+  .mbar { display:block; width:100%; height:7px; background:#091523; border:1px solid #1d3a5f; margin-top:4px; }
+  .mbar i { display:block; height:100%; background:#3fa37a; }
+  .mbar.full i { background:#ffd97a; }
+  .misDone { color:#3f5c7e; }
+
+  /* ---------- login bonus ---------- */
+  #loginModal { position:absolute; inset:0; background:#020610e0; z-index:47; display:none; align-items:center; justify-content:center; }
+  #loginModal.open { display:flex; }
+  #loginBox { background:#081627; border:3px solid #ffd97a; padding:16px 18px; width:min(330px,90vw); text-align:center; animation:pop .3s steps(5); }
+  #loginGrid { display:grid; grid-template-columns:repeat(4,1fr); gap:6px; margin:12px 0; }
+  .stamp { background:#0c2238; border:2px solid #1d3a5f; padding:6px 2px; font-size:10px; line-height:1.5; color:#6fa3d0; }
+  .stamp.got { border-color:#3fa37a; color:#bdffd9; }
+  .stamp.today { border-color:#ffd97a; color:#ffe6a3; animation:pop .4s steps(5); }
+  .stamp .fish { font-size:14px; }
+
+  /* ---------- landscape layout ---------- */
+  @media (orientation: landscape) {
+    #wrap { max-width:none; }
+    #nav {
+      left:auto; right:8px; bottom:auto; top:50%; transform:translateY(-50%);
+      flex-direction:column; width:118px; padding:0; gap:8px;
+    }
+    .navBtn { max-width:none; width:100%; }
+    #depthTag { right:134px; top:8px; }
+    #hud { right:134px; }
+    .panel {
+      left:auto; right:0; transform:none; top:0; bottom:0;
+      width:min(360px, 60%); max-height:100%; height:100%;
+      border:none; border-left:3px solid #2d5c8f;
+    }
+    #discBox canvas { width:72px; height:54px; }
+    #discover { flex-direction:row; }
+  }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game"></canvas>
+
+  <div id="hud">
+    <div class="stat"><span class="lbl">しきん</span><b id="hG">0</b> G</div>
+    <div class="stat"><span class="lbl">けんきゅう</span><b id="hR">0</b> pt</div>
+    <div class="stat"><span class="lbl">クルー</span><b id="hC">0/0</b></div>
+    <div class="stat"><span class="lbl">パーツ</span><b id="hP">0</b></div>
+    <div class="stat"><span class="lbl">きょうの客</span><b id="hV">0</b> 人</div>
+  </div>
+  <div id="depthTag">すいしん 0m</div>
+
+  <div id="nushiModal">
+    <h2 id="nushiTitle">!? 巨大ななにかが竿にかかった!!</h2>
+    <canvas id="nushiCv" width="220" height="34" style="width:100%;image-rendering:pixelated;background:#06101e;border:2px solid #1d3a5f;"></canvas>
+    <div id="nushiInfo" style="font-size:12px;color:#9fdcff;margin:6px 0;">金色のゾーンでタップ! 3回あわせて釣り上げろ!</div>
+    <button class="buyBtn gold" id="nushiBtn" style="font-size:16px;padding:10px 26px 8px;">あわせる!!</button>
+  </div>
+  <div id="tutBox"><button id="tutSkip">スキップ✕</button><span class="tStep" id="tutStep"></span><br><span id="tutText"></span></div>
+  <div id="nav">
+    <button class="navBtn" id="btnSub">潜水艇<span class="badge" id="subBadge">!</span></button>
+    <button class="navBtn" id="btnCrew">クルー</button>
+    <button class="navBtn" id="btnDex">図鑑 <span id="dexCount"></span></button>
+    <button class="navBtn" id="btnMis">ミッション<span class="badge" id="misBadge">!</span></button>
+    <button class="navBtn" id="btnHelp">メニュー</button>
+  </div>
+
+  <div class="panel" id="misPanel">
+    <div class="pTitle"><span>ミッション</span><button class="pClose" data-close="misPanel">とじる</button></div>
+    <div class="pBody" id="misBody"></div>
+  </div>
+
+  <div class="panel" id="buildPanel">
+    <div class="pTitle"><span>モジュール建設</span><button class="pClose" data-close="buildPanel">とじる</button></div>
+    <div class="pBody" id="buildBody"></div>
+  </div>
+
+  <div class="panel" id="modPanel">
+    <div class="pTitle"><span>施設</span><button class="pClose" data-close="modPanel">とじる</button></div>
+    <div class="pBody" id="modBody"></div>
+  </div>
+
+  <div class="panel" id="subPanel">
+    <div class="pTitle"><span>潜水艇ドック</span><button class="pClose" data-close="subPanel">とじる</button></div>
+    <div class="pBody" id="subBody"></div>
+  </div>
+
+  <div class="panel" id="crewPanel">
+    <div class="pTitle"><span>クルー名簿</span><button class="pClose" data-close="crewPanel">とじる</button></div>
+    <div class="pBody">
+      <div id="gachaBox">
+        <div style="font-size:14px;color:#ffe6a3;margin-bottom:8px;">✦ スカウトガチャ ✦</div>
+        <button class="gachaBtn" id="gachaBtn">1回 200G</button>
+        <button class="gachaBtn" id="gachaTkBtn">チケットで1回</button>
+        <button class="gachaBtn" id="gacha10Btn">5連 1000G</button>
+        <div id="tkTx" style="font-size:12px;color:#ffd97a;margin-top:7px;"></div>
+        <div id="pickupTx" style="font-size:11px;color:#7fe7d4;margin-top:3px;"></div>
+        <div class="rates">★5:2%　★4:8%　★3:20%　★2:30%　★1:40%<br>チケットはミッション・実績・ログボで入手</div>
+      </div>
+      <div id="crewList"></div>
+    </div>
+  </div>
+
+  <div class="panel" id="dexPanel">
+    <div class="pTitle"><span>深海生物図鑑</span><button class="pClose" data-close="dexPanel">とじる</button></div>
+    <div class="pBody"><div id="dexGrid"></div></div>
+  </div>
+
+  <div class="panel" id="helpPanel">
+    <div class="pTitle"><span>メニュー</span><button class="pClose" data-close="helpPanel">とじる</button></div>
+    <div class="mtabBar">
+      <button class="mtab on" data-mtab="report">📊レポート</button>
+      <button class="mtab" data-mtab="prestige">🚀移転</button>
+      <button class="mtab" data-mtab="settings">⚙せってい</button>
+      <button class="mtab" data-mtab="howto">📖あそびかた</button>
+    </div>
+    <div class="pBody" style="font-size:13px; line-height:2;">
+      <div class="mtabPage on" id="mtab-report">
+        <div class="item" style="display:block;">
+          <b style="color:#9fdcff;">📊 観光レポート</b>
+          <div id="guestReport" style="font-size:12px; line-height:1.9;"></div>
+          <div style="font-size:11px;color:#6fa3d0;margin-top:6px;">観光収入の推移(直近60秒)</div>
+          <canvas id="incCv" width="240" height="40" style="width:100%;max-width:260px;image-rendering:pixelated;background:#06101e;border:2px solid #1d3a5f;"></canvas>
+        </div>
+        <div class="item" style="display:block;">
+          <b style="color:#9fdcff;">📜 ジャーナル</b><span style="font-size:10px;color:#6fa3d0;">(さいきんの出来事 50件)</span>
+          <div id="journal" style="font-size:11px; line-height:1.8; max-height:160px; overflow-y:auto; overscroll-behavior:contain; touch-action:pan-y; background:#06101e; border:2px solid #1d3a5f; padding:4px 6px; margin-top:4px;"></div>
+        </div>
+      </div>
+      <div class="mtabPage" id="mtab-prestige">
+        <div class="item" style="display:block;">
+          <b style="color:#ffd97a;">🚀 新天地への移転(周回)</b>
+          <div id="presInfo" style="font-size:12px; line-height:1.8;"></div>
+          <div id="relicShop" style="font-size:12px; line-height:1.7; margin-top:6px;"></div>
+          <button class="buyBtn gold" id="presBtn" style="margin-top:6px;">移転する</button>
+        </div>
+      </div>
+      <div class="mtabPage" id="mtab-settings">
+        <div class="item" style="display:block;">
+          <b style="color:#9fdcff;">セーブ</b>
+          <div style="font-size:11px;color:#6fa3d0;line-height:1.7;">30秒ごとに自動保存(るす中もオフライン報酬が貯まる)。保存が効かない環境ではセーブコードを発行して保管してね</div>
+          <textarea id="saveTa" placeholder="ここにセーブコードを貼り付け"></textarea><br>
+          <button class="buyBtn" id="saveOut">コード発行</button>
+          <button class="buyBtn" id="saveIn">コード読込</button>
+          <button class="byeBtn" id="saveDel">自動保存を削除</button>
+        </div>
+        <div class="item" style="display:block; text-align:center;">
+          <b style="color:#9fdcff;">♿ サウンドとアクセシビリティ</b><br>
+          <button class="buyBtn" id="sndBtn">サウンド：OFF</button>
+          <div id="volRow">音量 <input type="range" id="volSlider" min="0" max="100" step="10" value="70"> <span id="volVal">70%</span></div>
+          <div style="font-size:11px;color:#6fa3d0;margin:2px 0 8px;">深海アンビエントBGM+効果音</div>
+          <button class="buyBtn" id="fontBtn">文字サイズ：標準</button>
+          <div style="font-size:11px;color:#6fa3d0;margin-top:4px;">レア度の★には数字を併記しています(例:★★★<span class="rnum">3</span>)</div>
+        </div>
+      </div>
+      <div class="mtabPage" id="mtab-howto">
+        <b style="color:#9fdcff;">あそびかた</b><br>
+        ・画面を上下にドラッグして海をながめよう<br>
+        ・シャフト横の「+」をタップしてモジュールを建設<br>
+        ・金色コインの枠はGで購入できる拡張スロット(横に最大3マス!)<br>
+        ・モジュールにはクルーの配属が必要(適性順に自動配属)<br>
+        ・医務室・休憩室・居住区以外は担当クルーがいないと停止!大型は2人<br>
+        ・同じ施設の2つ目からは研究ptも必要(上位施設は1つ目から)<br>
+        ・ガチャで★1〜★5のクルーをスカウト!居住区で上限UP<br>
+        ・働くクルーは経験値でレベルアップ→能力が伸びる<br>
+        ・クルーはときどき固有スキルを発動してボーナス!<br>
+        ・潜水艇はGで増艦できる(最大4隻で同時探索!)<br>
+        ・探索で「強化パーツ」を回収→施設をタップしてLv3まで強化<br>
+        ・発見した生物の人気が観光収入になる(レアほど高額)<br>
+        ・嵐やテレビ取材などのイベントにも注目!<br>
+        ・探索で30%の確率でアイテム発見!バフは倉庫(潜水艇)から使う<br>
+        <span style="color:#ffd97a">目指せ、図鑑コンプリートと★5クルー!</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="evBanner"></div>
+  <div id="buffBar"></div>
+
+  <div id="cutin"><div class="cutInner">
+    <canvas id="cutCv" width="10" height="12"></canvas>
+    <div class="cutTx"><b id="cutName"></b><div id="cutSkill"></div><div id="cutFx"></div></div>
+  </div></div>
+
+  <div id="multiModal"><div id="multiBox">
+    <div style="font-size:15px;color:#ffd97a;">✦ 5連スカウト結果 ✦</div>
+    <div id="multiGrid"></div>
+    <div id="multiNote" style="font-size:11px;color:#6fa3d0;"></div>
+    <button id="multiOk" class="buyBtn" style="margin-top:10px;">OK</button>
+  </div></div>
+
+  <div id="awayModal"><div id="awayBox">
+    <h2>おかえりなさい!</h2>
+    <div id="awayTx"></div>
+    <button id="awayOk" class="buyBtn" style="margin-top:10px;">うけとる</button>
+  </div></div>
+
+  <div id="loginModal"><div id="loginBox">
+    <div style="font-size:15px;color:#ffd97a;">🐟 ログインスタンプ 🐟</div>
+    <div id="loginGrid"></div>
+    <div id="loginTx" style="font-size:12px;color:#9fdcff;"></div>
+    <button id="loginOk" class="buyBtn" style="margin-top:10px;">うけとる!</button>
+  </div></div>
+
+  <div id="toasts"></div>
+
+  <div id="discover">
+    <div id="discBox">
+      <h2 id="discTitle">新種発見!</h2>
+      <canvas id="discCv" width="32" height="24"></canvas>
+      <div class="dn" id="discName"></div>
+      <div class="dr" id="discRar"></div>
+      <div class="dd" id="discDesc"></div>
+    </div>
+    <button id="discOk">やった!</button>
+  </div>
+
+  <div id="gachaModal">
+    <canvas id="gachaAnimC" width="140" height="120"></canvas>
+    <div id="gachaCard">
+      <div style="font-size:14px;color:#ffd97a;margin-bottom:8px;">新クルー加入!</div>
+      <canvas id="gachaCv" width="10" height="12"></canvas>
+      <div class="gn" id="gachaName"></div>
+      <div class="gs" id="gachaStars"></div>
+      <div class="gk" id="gachaSkill"></div>
+      <div class="gst" id="gachaStats"></div>
+      <br><button id="gachaOk">よろしく!</button>
+    </div>
+  </div>
+
+  <div id="intro">
+    <h1>深海ステーション物語</h1>
+    <p>ここは未知の海溝のうえに建てられた小さな研究ステーション。<br><br>モジュールを建設し、潜水艇を派遣して、まだ誰も見たことのない深海生物を発見しよう。</p>
+    <button id="startBtn">そうこう開始</button>
+  </div>
+</div>
+<script>
+'use strict';
+// ============================================================
+// 深海ステーション物語 - prototype
+// ============================================================
+
+// ---------- zones ----------
+const ZONES = [
+  {name:'陽光帯',   sub:'0〜200m',    col:'#0d3d63', unlockR:0,   unlockG:0,    expCost:40,  expTime:60},
+  {name:'薄明帯',   sub:'200〜1000m', col:'#082138', unlockR:80,  unlockG:400,  expCost:120, expTime:360},
+  {name:'深海帯',   sub:'1000〜4000m',col:'#04101d', unlockR:250, unlockG:1500, expCost:300, expTime:1200},
+  {name:'超深海帯', sub:'4000m〜',    col:'#02070f', unlockR:600, unlockG:5000, expCost:800, expTime:3600},
+];
+const LVPERZONE = 3, LH = 36, Y_WATER = 42, Y_SHAFT0 = 48, ROW0 = Y_SHAFT0 + 12;
+
+// ---------- buildings ----------
+const BTYPES = {
+  cap:  {name:'観光カプセル', cost:300, crew:1, zone:1, col:'#d99a3d', win:'#ffe9b0', desc:'おカネを生む(担当クルーの観光でUP)'},
+  lab:  {name:'研究ラボ',     cost:200, crew:1, zone:1, col:'#2da8a0', win:'#bdfff2', desc:'研究ptを生む(担当クルーの研究でUP)'},
+  hab:  {name:'居住区',       cost:150, crew:0, zone:1, col:'#5b79c9', win:'#dce6ff', desc:'クルー上限 +2'},
+  light:{name:'探照ライト',   cost:100, crew:1, zone:1, col:'#8a8458', win:'#fdf9c5', desc:'レア生物の発見率 +8%'},
+  rest: {name:'休憩室',       cost:180, crew:0, zone:1, col:'#7a9e5a', win:'#e4f0d0', desc:'クルー1人の体力と調子を少しずつ回復'},
+  med:  {name:'医務室',       cost:300, crew:0, zone:1, col:'#c95a5a', win:'#ffe0e0', desc:'病気のクルー1人を治療(Lvで治療が速い)'},
+  restaurant:{name:'レストラン', cost:450, crew:1, zone:2, col:'#d97a3d', win:'#ffe9c0', desc:'体力が低いクルー2人を中回復'},
+  game: {name:'娯楽室',       cost:400, crew:1, zone:2, col:'#8a5ac9', win:'#e8d8ff', desc:'調子が低いクルー1人の調子を上げていく'},
+  miyage:{name:'みやげ屋',    cost:600, crew:1, zone:2, col:'#c9a05a', win:'#fff0d0', desc:'図鑑1種につき +0.1G/s(Lvで倍増)'},
+  tank: {name:'展示水槽',     cost:900, crew:1, zone:2, big:true, col:'#2a7ab0', win:'#9fdcff', desc:'[大型] 発見した生物が泳ぐ!図鑑の人気ボーナス +8%(Lvごと)'},
+  dock2:{name:'整備ドック',   cost:700, crew:1, zone:2, col:'#5a8ac9', win:'#d8ecff', desc:'探索の派遣コスト -10%(Lvごと・最大50%)'},
+  train:{name:'訓練室',       cost:650, crew:1, zone:2, col:'#a06a4a', win:'#ffe4cc', desc:'いちばんLvの低いクルーが特訓で経験値を得る'},
+  ad:   {name:'広告塔',       cost:800, crew:1, zone:2, col:'#d95a8a', win:'#ffd8ea', desc:'フェリー増便+観光客UP・観光収入 +4%(Lvごと)'},
+  gym:  {name:'運動場',       cost:1200, crew:2, zone:3, big:true, col:'#4a9e6a', win:'#d0f0dc', desc:'全クルーの体力を回復&調子が下がりにくくなる'},
+  onsen:{name:'温泉',         cost:1500, crew:2, zone:3, big:true, col:'#d98aa0', win:'#ffe0ea', desc:'体力が低い3人を大回復+調子もほぐれる'},
+  hall: {name:'コンサートホール', cost:1500, crew:2, zone:3, big:true, col:'#7a5ad9', win:'#e0d8ff', desc:'全クルーの調子UP&公演収入 +6G/s'},
+  garden:{name:'深海植物園',  cost:1600, crew:1, zone:3, col:'#3a9e7a', win:'#c8ffe8', desc:'光る海藻が研究pt +1/s(故障の影響なし)'},
+  subfac:{name:'潜水艇工場',  cost:1800, crew:1, zone:3, col:'#7a7a8a', win:'#e0e0ec', desc:'潜航時間 -5%(Lvごと)'},
+  vault:{name:'金庫室',       cost:2000, crew:1, zone:3, col:'#b0903a', win:'#ffefb0', desc:'オフライン報酬の効率 +10%(Lvごと)'},
+  gate: {name:'龍宮ゲート',   cost:2800, crew:1, zone:4, col:'#7a5ad9', win:'#e4d8ff', desc:'レア生物の発見率 +15%(Lvごと)'},
+  plab: {name:'圧力研究所',   cost:2600, crew:1, zone:4, col:'#4a6a9e', win:'#d0e4ff', desc:'すべてのラボの研究 +10%(Lvごと)'},
+  spring:{name:'人魚の泉',    cost:3000, crew:2, zone:4, big:true, col:'#4ad8c8', win:'#e0fff8', desc:'[大型] 全員を癒し調子も守る。人魚がいると効果2倍'},
+  casino:{name:'海底カジノ',  cost:3500, crew:2, zone:4, big:true, col:'#c94a6a', win:'#ffd0dc', desc:'[大型] ときどき大金が転がりこむ!?'},
+};
+
+// ---------- creatures ----------
+// rare: 1=ふつう 2=めずらしい 3=でんせつ
+const CREATURES = [
+ {id:'kuma', z:0, rare:1, name:'クマノミ', desc:'イソギンチャクと仲よしの人気者。観光客のアイドル。',
+  pal:{o:'#ff8c3b',w:'#fff3e0',k:'#1c1c1c'},
+  px:['....oooo..','..owwoo.o.','.oowwooooo','okowwoowoo','.oowwooooo','..owwoo.o.','....oooo..']},
+ {id:'kurage', z:0, rare:1, name:'ミズクラゲ', desc:'ふわふわ漂う半透明のかさ。よく見ると四つ葉模様。',
+  pal:{b:'rgba(160,215,255,.85)',B:'rgba(120,190,250,.95)',w:'#ffffff'},
+  px:['..bbbbbb..','.bBBBBBBb.','bBwBBBBwBb','bBBBBBBBBb','.b.b..b.b.','..b.bb.b..','.b..b..b..','....b.....']},
+ {id:'kame', z:0, rare:3, name:'アオウミガメ', desc:'ゆったり泳ぐ海の長老。甲羅の模様はひとつずつ違う。',
+  pal:{g:'#3fa66a',G:'#2c7a4d',y:'#cfe8a0',k:'#1c1c1c'},
+  px:['....GGGG....','..GGyGyGGg..','.GyGyGyGyGg.','gGGGGGGGGGgk','.g..g..g..g.','............']},
+ {id:'manbo', z:0, rare:3, name:'マンボウ', desc:'のんびり屋の巨体。日なたぼっこが大好き。',
+  pal:{s:'#9fb6c4',S:'#7a93a3',w:'#e8f2f7',k:'#1c1c1c'},
+  px:['.....S....','..ssssS...','.sssssss..','ksssssssw.','.sssssss..','..ssssS...','.....S....']},
+ {id:'hotaru', z:1, rare:1, name:'ホタルイカ', desc:'青い光をまとう小さなイカ。群れると海が星空になる。',
+  pal:{i:'#4a5b8f',l:'#6ef0ff',k:'#101426'},
+  px:['..ii..','.iiii.','iliili','iiiiii','.l.il.','i.l..i','.i..i.']},
+ {id:'kurione', z:1, rare:2, name:'クリオネ', desc:'流氷の天使…のいとこ。ぱたぱた羽ばたいて泳ぐ。',
+  pal:{p:'rgba(255,190,215,.9)',r:'#ff7a9a',w:'#fff'},
+  px:['..pp..','.pwwp.','pprrpp','.pppp.','p.pp.p','..pp..','...p..']},
+ {id:'ryugu', z:1, rare:5, name:'リュウグウノツカイ', desc:'銀色に輝く伝説の使者。出会えたら幸運のしるし。',
+  pal:{s:'#cdd9e4',r:'#ff5a6e',k:'#1c1c1c'},
+  px:['r..r..r..r..r...','sssssssssssssss.','kssssssssssssss.','sssssssssssssss.','.r..r..r..r..r..']},
+ {id:'shira', z:1, rare:5, name:'シーラカンス', desc:'生きた化石。4億年前からほとんど姿を変えていない。',
+  pal:{b:'#3a5d8f',B:'#2b4569',w:'#9fc4e8',k:'#0d1421'},
+  px:['....bbbbbb..B.','..bbBbbbbbbbB.','.wbbbbbBbbbbBB','kbbbBbbbbbbbB.','.bbbbbbBbbbbB.','..B..bb...B...']},
+ {id:'ankou', z:2, rare:2, name:'チョウチンアンコウ', desc:'頭の提灯で獲物をおびきよせる深海のハンター。',
+  pal:{a:'#4a3b5e',l:'#ffe97a',w:'#fff',k:'#15101f'},
+  px:['..l.......','..a.......','.aaaaaa...','aawaaaaaa.','akkkaaaaa.','.aaaaaa...','..a..a....']},
+ {id:'mendako', z:2, rare:2, name:'メンダコ', desc:'耳のようなヒレをもつ深海のまんじゅう。ふにふに。',
+  pal:{p:'#e88aa0',P:'#c4607e',k:'#3a1622'},
+  px:['.P......P.','.pppppppp.','ppkppppkpp','pppppppppp','.pppppppp.','..p.pp.p..']},
+ {id:'gusoku', z:2, rare:2, name:'オオグソクムシ', desc:'海底の掃除屋さん。何年も食べなくても平気らしい。',
+  pal:{g:'#8a93a3',G:'#5d6675',k:'#23272f'},
+  px:['.GGGGGGGG.','GgggggggGG','GgGgGgGgGk','.g.g.g.g..']},
+ {id:'demeni', z:2, rare:3, name:'デメニギス', desc:'頭が透明なふしぎな魚。緑の目で上を見つめている。',
+  pal:{t:'rgba(140,200,230,.55)',b:'#37506b',e:'#5aff8a',k:'#101a26'},
+  px:['.ttttbbbbb..','tetttbbbbbb.','tettbbbbbbbk','ttttbbbbbbb.','.tttbbbbb...']},
+ {id:'yurei', z:3, rare:3, name:'ユウレイイカ', desc:'闇の中をすうっと漂う、ほの白い影。',
+  pal:{w:'rgba(225,235,255,.8)',l:'#9adfff',k:'#1a2433'},
+  px:['..www...','.wwwww..','wwlwwlw.','wwwwwww.','.w.w.w..','w..w..w.','.w....w.']},
+ {id:'ryuo', z:3, rare:5, name:'リュウグウノヌシ', desc:'超深海にすむといわれる発光する主。実在は…確認された!',
+  pal:{d:'#1d3a5f',D:'#142a47',l:'#7fe7d4',e:'#ffd97a',k:'#070d18'},
+  px:['l...l...l...l...','dDddddDdddDddd..','DdldldldldldlDd.','edddddddddddddDl','DdldldldldldlDd.','dDddddDdddDddd..','l...l...l...l...']},
+ {id:'chinana', z:0, rare:1, name:'チンアナゴ', desc:'砂からひょっこり。じっと潮の流れを見つめている。',
+  pal:{w:'#f2f0e4',o:'#3a3a3a',k:'#1c1c1c'},
+  px:['.ww.','.wk.','.ww.','.wo.','.ww.','.wo.','.ww.','.ww.']},
+ {id:'tatsu', z:0, rare:2, name:'タツノオトシゴ', desc:'おとうさんが子育てをする海の竜。尻尾でつかまり休憩中。',
+  pal:{y:'#e8c84a',Y:'#b89a2e',k:'#1c1c1c'},
+  px:['..yy....','.yyky...','..yY....','..yyy...','...yyy..','..yyY...','...yy...','..yY....','...y....']},
+ {id:'jinbe', z:0, rare:5, name:'ジンベエザメ', desc:'世界最大の魚。星空もようの背中で悠々と泳ぐ優しい巨人。',
+  pal:{g:'#3f5d7a',w:'#cfe0ee',k:'#10141c'},
+  px:['....ggggggggggg...','..ggwgwgwgwggggg..','.gwgwgwgwgwggggggg','kggggggggggggg.gg.','.ggggggggggggggg..','...gg...gg...g....']},
+ {id:'hadaka', z:1, rare:1, name:'ハダカイワシ', desc:'おなかの発光器をチカチカ。深海でいちばん数が多い魚。',
+  pal:{s:'#aebfd0',k:'#1c1c1c',l:'#7adfff'},
+  px:['..ssssss..','.skssssss.','.ssssssss.','..l.l.l.l.']},
+ {id:'takaashi', z:1, rare:3, name:'タカアシガニ', desc:'脚をひろげると3m超え!世界最大の現生節足動物。',
+  pal:{o:'#d97a4a',k:'#1c1c1c'},
+  px:['.....oooo.....','..o..oooo..o..','.o..ookkoo..o.','o..o.oooo.o..o','..o..o..o..o..','.o..o....o..o.']},
+ {id:'koumori', z:2, rare:4, name:'コウモリダコ', desc:'地獄の吸血イカ…という名前だけどマリンスノーを食べる平和派。',
+  pal:{r:'#6e2c3e',R:'#4a1c2a',e:'#7adfff'},
+  px:['..rrrr....','.rrrrrr...','rreRRrrr..','rrRRRRrr..','.rr..rr...','r.r..r.r..']},
+ {id:'rabuka', z:2, rare:4, name:'ラブカ', desc:'太古の姿のままのサメ。えらのフリルがおしゃれ。',
+  pal:{b:'#6e503a',B:'#4a3625',k:'#15100a'},
+  px:['bbbbbbbbbbbbb...','kbBbbbBbbbBbbbb.','bbbbbbbbbbbbbb..','..b...b...b.....']},
+ {id:'onden', z:3, rare:3, name:'オンデンザメ', desc:'寿命400年とも。深海をゆっくりゆっくり泳ぐ長寿ザメ。',
+  pal:{g:'#5d6670',k:'#15181c'},
+  px:['...gggggggggg...','.ggggggggggggg..','kgggggggggggggg.','.gggg...ggg..g..']},
+ {id:'kaikou', z:3, rare:1, name:'カイコウオオソコエビ', desc:'水深1万mの超深海に暮らすヨコエビ。世界一深い場所の住人。',
+  pal:{p:'#cfd8cc',k:'#3a3f3a'},
+  px:['..pppppp..','.pppppppp.','pkpppppp.p','.p.p.p.p..']},
+ // ---- 追加の魚10種 ----
+ {id:'fugu', z:0, rare:1, name:'フグ', desc:'おこるとまんまる。トゲトゲだけど顔はのんき。',
+  pal:{y:'#e8d04a',s:'#8a8458',k:'#1c1c1c',w:'#fff'},
+  px:['..s.s.s..','.yyyyyyy.','syykyykys','.yyyyyyy.','syyywyyys','.yyyyyyy.','..s.s.s..']},
+ {id:'utsubo', z:0, rare:2, name:'ウツボ', desc:'岩のすきまから顔を出す海のギャング。実は臆病。',
+  pal:{g:'#5d7a3f',G:'#42592c',k:'#15200a'},
+  px:['gggggggggggg....','kgGgGgGgGgggggg.','gggggggggggg....']},
+ {id:'manta', z:0, rare:4, name:'オニイトマキエイ', desc:'海を飛ぶ巨大なマンタ。ひらひらと優雅に旋回する。',
+  pal:{m:'#37506b',M:'#243a52',k:'#0d1421'},
+  px:['....mmmmmmm.....','..mmmmmmmmmmm...','mmmkmmmmmmmmmmM.','..mmmmmmmmmmmMMM','....mmmmmmm.....']},
+ {id:'sakura', z:1, rare:1, name:'サクラエビ', desc:'駿河湾の宝石。群れると海がうす桃色に染まる。',
+  pal:{p:'#ff9eba',k:'#3a1622'},
+  px:['..pppp..','.pppppp.','pkpppp.p','..p.p...']},
+ {id:'oumu', z:1, rare:2, name:'オウムガイ', desc:'うずまき貝の生きた化石。すいすい後ろ向きに泳ぐ。',
+  pal:{n:'#d9a05a',N:'#b07a3a',w:'#fff3e0',t:'#e8c8a0',k:'#1c1c1c'},
+  px:['..nnnnnn..','.nNNNNNNn.','nNNwwNNNnk','nNNwNwNNnt','.nNNNNnn.t','..nnnn..t.']},
+ {id:'mitsukuri', z:2, rare:3, name:'ミツクリザメ', desc:'長いツノとびっくり顎をもつ「テンサイザメ」。',
+  pal:{p:'#c98ea0',P:'#a06a7e',k:'#2a0f1a'},
+  px:['ppppp...........','.ppppppppppppp..','..pkppppppppppPP','...pppppppppppP.','.....pp...pp....']},
+ {id:'nuta', z:2, rare:1, name:'ヌタウナギ', desc:'ぬるぬるの粘液で身を守る、あごのない古代魚。',
+  pal:{b:'#7a6a8a',k:'#241c2e'},
+  px:['.bbbbbbbbbbbb.','bkbbbbbbbbbbbb','.bbbbbbbbbbb..']},
+ {id:'hourai', z:2, rare:3, name:'ホウライエソ', desc:'ガラスのようなキバの持ち主。発光器で獲物をさそう。',
+  pal:{v:'#3a3a5e',V:'#28284a',w:'#e8f2f7',l:'#7adfff',k:'#10101f'},
+  px:['l..............','vvvvvvvvvvvvv..','kvVvVvVvVvvvvvv','wvvvvvvvvvvvv..','.w.............']},
+ {id:'kusauo', z:3, rare:2, name:'シンカイクサウオ', desc:'水深8,000mの最深記録ホルダー。ぷるぷるの体。',
+  pal:{p:'rgba(230,220,240,.85)',k:'#5a5a6e'},
+  px:['..pppppp..','.ppppppppp','pkpppppppp','.pppppppp.','...p..p...']},
+ {id:'daiouika', z:3, rare:4, name:'ダイオウイカ', desc:'全長18m、深海最大のミステリー。巨大な目が闇を見つめる。',
+  pal:{r:'#a04a5e',R:'#7a3346',k:'#1a0a10',e:'#cfe0ee'},
+  px:['....rr..........','..rrrrr.........','.rrrrrrr........','rrrerrrrtttttttt'.replace(/t/g,'R'),'.rrrrrrr.R.R.R.R','..rrrrr..R..R...','....rr..........']},
+ // ---- ひろいもの10種(kind:'obj') ----
+ {id:'gomi', z:0, rare:1, kind:'obj', pop:0.2, name:'ゴミ袋', desc:'海洋ゴミ…。回収して海をきれいに!展示で環境啓発。',
+  pal:{g:'#8a93a3',G:'#5d6675'},
+  px:['...gg...','..gggg..','.gggggg.','.gGgggg.','.ggggGg.','.gggggg.','..gggg..']},
+ {id:'kasa', z:0, rare:1, kind:'obj', pop:0.2, name:'折れた傘', desc:'台風の日に飛ばされてきたのだろうか。骨が3本ない。',
+  pal:{u:'#5b79c9',U:'#3a4f8a',k:'#2c2620'},
+  px:['..uuuuu...','.uUuuUuu..','uu.u..uu..','...k......','...k......','..kk......']},
+ {id:'nagagutsu', z:0, rare:1, kind:'obj', pop:0.2, name:'長ぐつ', desc:'釣りゲームの定番。片方だけなのが切ない。',
+  pal:{y:'#d9c84a',Y:'#b0a02e'},
+  px:['..yyy...','..yyy...','..yYy...','..yyyy..','.yyyyYy.','.yyyyyy.']},
+ {id:'taiya', z:1, rare:2, kind:'obj', pop:0.2, name:'古タイヤ', desc:'魚たちのかくれ家になっていた。リサイクル決定。',
+  pal:{t:'#3a3f47',k:'#15181c'},
+  px:['..ttttt..','.tt...tt.','tt..k..tt','tt.....tt','.tt...tt.','..ttttt..']},
+ {id:'bottle', z:1, rare:2, kind:'obj', pop:0.6, name:'メッセージボトル', desc:'中の手紙には「タカラハ サラニ フカクニ」と…?',
+  pal:{b:'rgba(160,215,200,.85)',w:'#fff3e0',c:'#b08a2e'},
+  px:['..bbbbbbbbc.','.bwwwwwwbbcc','..bbbbbbbbc.']},
+ {id:'ikari', z:2, rare:3, kind:'obj', pop:0.6, bounty:400, name:'沈没船の錨', desc:'巨大な錨。近くに船体が眠っているかもしれない。',
+  pal:{a:'#5d6670',A:'#3a424d'},
+  px:['....aa....','...aaaa...','....aa....','....aa....','.a..aa..a.','.aA.aa.Aa.','..aaaaaa..','....aa....']},
+ {id:'doki', z:2, rare:3, kind:'obj', pop:0.6, bounty:600, name:'古代の土器', desc:'数千年前の壺。考古学チームが大さわぎ。',
+  pal:{o:'#b07a4a',O:'#8a5a2e'},
+  px:['..oooo..','.o....o.','..oooo..','.oooooo.','oooOOooo','oooooooo','.oooooo.','..oooo..']},
+ {id:'kinkai', z:3, rare:4, kind:'obj', pop:0.6, bounty:1500, name:'金塊', desc:'ずっしり輝く純金のかたまり。どこから来たの…?',
+  pal:{g:'#ffd97a',G:'#b08a2e'},
+  px:['..ggggg..','.ggGGGgg.','gggGGGggg','.gGgggGg.','..ggggg..']},
+ {id:'megane', z:1, rare:1, kind:'obj', pop:0.2, name:'水中メガネ', desc:'だれかの忘れもの。レンズに小魚がすみついていた。',
+  pal:{f:'#3fa37a',w:'rgba(160,215,255,.8)',k:'#1c2e26'},
+  px:['ffffff.ffffff','fwwwwfkfwwwwf','fwwwwf.fwwwwf','ffffff.ffffff']},
+ {id:'kaizoku', z:3, rare:5, kind:'obj', pop:3.0, bounty:3000, name:'海賊王の宝箱', desc:'伝説の大海賊が残した財宝!発見ボーナスがすごい!!',
+  pal:{c:'#8a5a2e',C:'#5e3c1c',G:'#ffd97a',k:'#2c1c0a',l:'#fff3c8'},
+  px:['..cccccccc.l','.cCCCCCCCCc.','.cccccccccc.','.cGGGGGGGGc.','.cCCCkkCCCc.','.cCCCCCCCCc.','l.ccccccccc.']},
+ {id:'mermaid', z:3, rare:5, hidden:true, name:'人魚マーメ', desc:'超深海にすむという伝説の人魚。出会えた者には海の祝福が…。発見後、クルーとして仲間になった!',
+  pal:{h:'#4ad8c8',s:'#ffe4cc',t:'#3fa3d9',T:'#2c7fb0',f:'#9fe8ff',k:'#1c1c1c',p:'#ff9eba'},
+  px:['..hhh...........','.hhskh..........','..hsss.tttt.....','...psttttttTT.f.','....stttttTT.ff.','......tttT...f..','........T.......']},
+ // ---- 各海域のヌシ(釣りイベント限定) ----
+ {id:'nushi0', z:0, rare:5, boss:true, pop:3.5, bounty:1500, name:'ヌシ・コガネ', desc:'陽光帯のヌシ。黄金のうろこを持つ巨大マグロ。釣り上げた者に幸運を呼ぶという。',
+  pal:{y:'#ffd97a',Y:'#d9a93d',k:'#1c1c1c',w:'#fff8e0'},
+  px:['....yyyyyyyy....','..yyyyyyyyyyyy..','.yYkyyyyyyyyyYY.','yyyyyywwyyyyyyYY','.yYyyyyyyyyyYY..','..yyyyyyyyyy.YY.','....yy..yy......']},
+ {id:'nushi1', z:1, rare:5, boss:true, pop:3.5, bounty:2200, name:'ヌシ・シラベ', desc:'薄明帯のヌシ。銀色にうたう大ウナギ。その歌声は深海のしらべ。',
+  pal:{s:'#cfd9e8',S:'#9fb0c8',k:'#1c1c1c',b:'#7fe7d4'},
+  px:['ssss............','.sksssssss......','..sssssssssss...','....sSSssssssss.','..sss..sSSsss...','.bb......sss....','..........s.....']},
+ {id:'nushi2', z:2, rare:5, boss:true, pop:3.5, bounty:3000, name:'ヌシ・クラヤミ', desc:'深海帯のヌシ。漆黒の大アンコウ。ちょうちんの光に迷い込んだら戻れない。',
+  pal:{k:'#15151d',K:'#0a0a12',e:'#ff6a6a',l:'#fff3b0',t:'#3a3a4a'},
+  px:['......l.........','.....t..........','..kkkkkkkkkk....','.kekkkkkkkkkkk..','kkkkKKKKKkkkkkk.','.kkkkkkkkkkkk...','...kk...kk......']},
+ {id:'nushi3', z:3, rare:5, boss:true, pop:4.0, bounty:5000, name:'ヌシ・ワダツミ', desc:'超深海のヌシにして海の王。青くかがやく龍。すべての海をたばねる伝説。',
+  pal:{b:'#4a8ad9',B:'#2a5a9e',e:'#ffd97a',w:'#9fdcff',k:'#1c1c1c'},
+  px:['..bb............','.bekbb..........','bbbbbbbb..ww....','.Bbbbbbbbbwwbb..','...BbbbbbbbbbbB.','.....Bbbb..bbb..','......bb....b...']},
+];
+
+// ---------- crew ----------
+const FIRSTN=['タロウ','ハナ','ケン','ミオ','ソラ','レン','ユイ','カイ','リン','ナギ','コハル','テツ','モモ','ジン','アン','ヒロ','サキ','ゴロー','ツムギ','ルカ'];
+const SKILLN={
+  tour:[['えがお','よびこみ上手'],['おもてなし上手','ごあんない名人'],['名物ガイド','SNSバズらせ屋'],['カリスマガイド','ツアーの神様'],['伝説の接客','海上の太陽']],
+  res: [['メモ魔','ひらめき'],['分析好き','夜ふかし観察'],['発見の眼','論文マシン'],['天才研究者','深海オタク'],['深海の賢者','万物の探究者']],
+  pilot:[['かじ取り見習い','海図よみ'],['潜航訓練済み','ソナーの耳'],['急速潜航','嵐わたり'],['エース操縦士','深海レーサー'],['深淵を知る者','海流のささやき']],
+  humor:[['だじゃれ見習い','ものまね'],['ムードメーカー','一発ギャグ'],['宴会部長','コメディアン'],['カリスマ芸人','笑いの錬金術師'],['伝説のエンターテイナー','深海一の人気者']],
+};
+// ★3以上のクルーは低確率で特殊スキル持ち
+const SPSKILL=[
+  {name:'宝箱ハンター', fx:'parts',   d:'発動：強化パーツ+2'},
+  {name:'幸運の歌声',   fx:'lucky',   d:'発動：次の探索レア率UP'},
+  {name:'タフネス',     fx:'tough',   d:'常時：体力の減りが半分／発動：自分を回復'},
+  {name:'鋼の免疫',     fx:'immune',  d:'常時：病気になりにくい／発動：病人1人を即治療'},
+  {name:'ポジティブ',   fx:'positive',d:'常時：調子が下がりにくい／発動：自分の調子MAX'},
+  {name:'癒しのうた',   fx:'healall', d:'発動：全員の体力を回復'},
+  {name:'応援団長',     fx:'cheer',   d:'発動：全員の調子+1'},
+  {name:'お薬マイスター', fx:'medic', d:'発動：いちばん弱った仲間を大回復'},
+];
+const STATN={tour:'観光',res:'研究',pilot:'操縦',humor:'ユーモア'};
+const STAR_COL=['#9fb6c4','#7fe7d4','#6ea8ff','#c77ddb','#ffd97a'];
+const HAIRC=['#3a2c20','#6e4a2f','#1d1d24','#a86a32','#d8c08a','#7a4a5e','#4a6a8a','#cf4f3e'];
+const SKINC=['#ffd9b0','#eebf95','#c98e62'];
+const UNIC={tour:'#d99a3d',res:'#2da8a0',pilot:'#5b79c9',humor:'#d95a8a'};
+let crewSeq=1;
+function makeCrewSprite(c){
+  if(c.mermaid) return makeMermaidSprite();
+  const oc=document.createElement('canvas'); oc.width=10; oc.height=12;
+  const o=oc.getContext('2d');
+  o.fillStyle=c.hair; o.fillRect(2,0,6,1); o.fillRect(1,1,8,2);          // hair
+  o.fillStyle=c.skin; o.fillRect(2,3,6,3);                               // face
+  o.fillStyle=c.hair; o.fillRect(1,3,1,1); o.fillRect(8,3,1,1);          // sideburns
+  o.fillStyle='#1c1c1c'; o.fillRect(3,4,1,1); o.fillRect(6,4,1,1);       // eyes
+  o.fillStyle=UNIC[c.main]; o.fillRect(2,6,6,4);                         // uniform
+  o.fillStyle=c.skin; o.fillRect(1,6,1,3); o.fillRect(8,6,1,3);          // arms
+  o.fillStyle='#ffffff'; o.fillRect(4,6,2,1);                            // collar
+  if(c.star>=4){ o.fillStyle='#ffd97a'; o.fillRect(4,7,2,2); }           // gold badge
+  if(c.star===5){ o.fillStyle='#ffd97a'; o.fillRect(0,0,1,1); o.fillRect(9,1,1,1); } // sparkle
+  o.fillStyle='#243240'; o.fillRect(3,10,2,2); o.fillRect(6,10,2,2);     // legs
+  return oc;
+}
+const pickupMain = () => ['tour','res','pilot','humor'][Math.floor(Date.now()/180000)%4]; // 3分ごとに交代
+function genCrew(star){
+  const mains=Object.keys(UNIC);
+  const main = Math.random()<0.6 ? pickupMain() : mains[Math.floor(Math.random()*mains.length)];
+  const stats={};
+  for(const k of mains) stats[k]=Math.max(1, Math.min(10, 1+Math.floor(Math.random()*star*1.5)));
+  stats[main]=Math.min(10, star*2);
+  const c={
+    id:'c'+(crewSeq++),
+    name:FIRSTN[Math.floor(Math.random()*FIRSTN.length)],
+    star, main, stats,
+    xp:0, clv:1,
+    hp:100, cond:3, condP:0, sick:false, sickT:0,
+    hair:HAIRC[Math.floor(Math.random()*HAIRC.length)],
+    skin:SKINC[Math.floor(Math.random()*SKINC.length)],
+  };
+  if(star>=3 && Math.random()<0.25){
+    const sp=SPSKILL[Math.floor(Math.random()*SPSKILL.length)];
+    c.skill=sp.name; c.skillFx=sp.fx; c.skillD=sp.d;
+  } else {
+    const pool=SKILLN[main][star-1];
+    c.skill=pool[Math.floor(Math.random()*pool.length)];
+  }
+  c.spr=makeCrewSprite(c);
+  return c;
+}
+const GACHA_COST=200;
+function gachaRoll(){
+  const r=Math.random()*100;
+  return r<2?5 : r<10?4 : r<30?3 : r<60?2 : 1;
+}
+function makeMermaidSprite(){
+  const oc=document.createElement('canvas'); oc.width=10; oc.height=12;
+  const o=oc.getContext('2d');
+  o.fillStyle='#4ad8c8'; o.fillRect(2,0,6,1); o.fillRect(1,1,8,2);         // 髪
+  o.fillStyle='#ffe4cc'; o.fillRect(2,3,6,3);                              // 顔
+  o.fillStyle='#4ad8c8'; o.fillRect(1,3,1,5); o.fillRect(8,3,1,5);         // ロングヘア
+  o.fillStyle='#1c1c1c'; o.fillRect(3,4,1,1); o.fillRect(6,4,1,1);         // 目
+  o.fillStyle='#ff9eba'; o.fillRect(3,6,4,2);                              // 貝がらトップ
+  o.fillStyle='#ffe4cc'; o.fillRect(2,6,1,2); o.fillRect(7,6,1,2);         // 腕
+  o.fillStyle='#3fa3d9'; o.fillRect(3,8,4,2); o.fillRect(4,10,2,1);        // 尾
+  o.fillStyle='#9fe8ff'; o.fillRect(2,11,2,1); o.fillRect(6,11,2,1);       // 尾びれ
+  o.fillStyle='#ffd97a'; o.fillRect(0,0,1,1); o.fillRect(9,2,1,1);         // きらめき
+  return oc;
+}
+function makeMermaidCrew(){
+  const c={
+    id:'c'+(crewSeq++), name:'マーメ', star:5, main:'tour',
+    stats:{tour:10, res:8, pilot:9, humor:9},
+    skill:'海の祝福', skillFx:'mermaid', mermaid:true,
+    xp:0, clv:1, hp:100, cond:5, condP:0, sick:false, sickT:0,
+    hair:'#4ad8c8', skin:'#ffe4cc',
+  };
+  c.spr=makeMermaidSprite();
+  return c;
+}
+
+// ---------- state ----------
+const S = {
+  g: 800, r: 0, crewCap: 4, parts: 0, tickets: 0,
+  gen: 1, relics: 0,                  // 移転回数(世代)と「ふか石」(ショップ通貨)
+  relicUp: {tour:0,res:0,exp:0,crew:0,luck:0},   // レリックショップの永続Lv(各最大5)
+  incHist: [],                        // 直近60秒の観光収入/秒(グラフ用・非保存でも可だが保存)
+  quest: null,                        // 依頼 {cid, src, g, tk, until}
+  tut: 0,                             // チュートリアル進行(99=完了)
+  tutDoneAt: 0,                       // 完了時刻(しばらくイベントを抑制)
+  bigFont: false,                     // アクセシビリティ:大きめ文字
+  abyss: {d:0, best:0},               // エンドレス深度(m)…移転してもリセットされない
+  abyssExp: null,                     // 深層挑戦中 {t0,dur,pid}
+  wkc: {key:null, n:0, done:false},   // 週替わりチャレンジの進行
+  freeWarp: {key:null, used:false},   // ⚡いますぐ帰還の無料枠(1日1回)
+  warpN: {key:null, n:[0,0,0,0,0]},   // ⚡帰還の本日使用回数(層z0-z3+未踏深層)…回数で料金が倍々
+  log: [],                            // 通知ジャーナル(直近50件)
+  life: {exp:0, gacha:0, earn:0},     // 累計記録(実績用)
+  guests: {key:null, n:0, prev:0, total:0},   // 観光客数(きょう/きのう/累計)
+  items: {},                          // 所持アイテム {id:count}
+  buffs: {speed:0, gold:0, luck2:0},  // バフ終了時刻(ms)
+  ach: {},                            // 実績受取済み
+  login: {last:'', day:0},            // ログインスタンプ
+  crew: [],             // {id,name,star,main,stats,skill,spr}
+  zoneUnlocked: 1,
+  subs: 1,              // 所有する潜水艇の数(最大4)
+  slots: [],            // {zone, lv, side(-1|1), b:null|typeKey}
+  exps: [],             // 出航中の探索 [{zone, t0, dur}]
+  dex: {},              // id -> count
+  started: false,
+};
+const MAXPOS = 3;   // 各列・各方向の最大スロット数(横拡張)
+for (let z=0; z<ZONES.length; z++)
+  for (let l=0; l<LVPERZONE; l++)
+    for (const side of [-1,1])
+      for (let pos=1; pos<=MAXPOS; pos++)
+        S.slots.push({zone:z, lv:l, side, pos, owned: pos===1, b:null, blv:1});
+const slotCost = s => 400 * s.pos * (s.zone+1);
+const slotPurchasable = s =>
+  s.pos===1 ? false :   // pos1は最初から所有
+  S.slots.some(o=> o.zone===s.zone && o.lv===s.lv && o.side===s.side && o.pos===s.pos-1 && o.owned);
+
+const rowY  = (zone,lv) => ROW0 + (zone*LVPERZONE+lv)*LH;
+const zoneTopY = z => ROW0 + z*LVPERZONE*LH - 10;
+const WORLD_BOTTOM = rowY(3, LVPERZONE) + 60;
+const discCount = () => Object.keys(S.dex).length;
+const countB    = k  => S.slots.filter(s=>s.b===k).length;
+const workingN  = () => countB('cap') + countB('lab');
+// 建設済み施設の必要クルー総数(医務室・休憩室・居住区はクルー不要)
+const crewNeed  = () => S.slots.reduce((n,s)=> n + ((s.b && s.b!=='__ext' && BTYPES[s.b]) ? (BTYPES[s.b].crew||0) : 0), 0);
+const slotId    = s => s.zone+'-'+s.lv+'-'+s.side+'-'+s.pos;
+
+// 自動配属：観光カプセルは観光順、ラボは研究順、操縦は全体の操縦トップ
+let asgCache=null, asgDirty=true;
+function assignments(){
+  if(!asgDirty && asgCache) return asgCache;
+  const roster = S.crew.filter(c=>!c.sick);   // 病気のクルーは働けない
+  const used=new Set();
+  // 操縦士:潜水艇1隻につき1人を専属で確保(操縦が高い順)。施設の担当には就かない
+  const pilots = [...roster].sort((a,b)=>b.stats.pilot-a.stats.pilot).slice(0, S.subs);
+  pilots.forEach(c=>used.add(c.id));
+  const nCap=countB('cap'), nLab=countB('lab');
+  const caps=[], labs=[];
+  for(const c of roster.filter(c=>!used.has(c.id)).sort((a,b)=>b.stats.tour-a.stats.tour)){
+    if(caps.length<nCap){ caps.push(c); used.add(c.id); }
+  }
+  for(const c of roster.filter(c=>!used.has(c.id)).sort((a,b)=>b.stats.res-a.stats.res)){
+    if(labs.length<nLab){ labs.push(c); used.add(c.id); }
+  }
+  // その他の施設へ残りのクルーを配属(施設の相性能力が高い人を優先採用)
+  const staff={};
+  for(const s of S.slots){
+    if(!s.b || s.b==='__ext' || s.b==='cap' || s.b==='lab' || !BTYPES[s.b]) continue;
+    const need = BTYPES[s.b].crew||0;
+    if(need===0) continue;
+    const avail = roster.filter(c=>!used.has(c.id));
+    if(avail.length >= need){
+      const k = FACSTAT[s.b];
+      const picked = (k ? [...avail].sort((a,b)=>(b.stats[k]||0)-(a.stats[k]||0)) : avail).slice(0, need);
+      picked.forEach(c=>used.add(c.id));
+      staff[slotId(s)] = picked;
+    } else staff[slotId(s)] = null;   // 人手不足 → 停止
+  }
+  asgCache={caps,labs,pilots,pilot:pilots[0]||null,staff}; asgDirty=false;
+  return asgCache;
+}
+// ---------- ヌシ釣りミニゲーム ----------
+let nushi=null;   // {cid, pos, dir, zone:[lo,hi], hits, miss, raf}
+function nushiChance(z){ return S.dex['nushi'+z] ? 0 : 0.04; }   // 未捕獲なら4%で出現
+function startNushi(z){
+  const c=CREATURES.find(x=>x.id==='nushi'+z);
+  if(!c || nushi) return;
+  const w=18;
+  const lo=20+Math.random()*(100-40-w);
+  nushi={cid:c.id, pos:0, dir:1, speed:1.6+z*0.5, zone:[lo,lo+w], hits:0, miss:0};
+  $('nushiTitle').textContent='!? 巨大ななにかが竿にかかった!!';
+  $('nushiInfo').textContent='金色のゾーンでタップ! 3回あわせて釣り上げろ!';
+  $('nushiModal').classList.add('open');
+  blip([196,233,196],'sawtooth',.25);
+  nushiLoop();
+}
+function nushiLoop(){
+  if(!nushi) return;
+  nushi.pos += nushi.dir*nushi.speed;
+  if(nushi.pos>=100){ nushi.pos=100; nushi.dir=-1; }
+  if(nushi.pos<=0){ nushi.pos=0; nushi.dir=1; }
+  drawNushi();
+  nushi.raf=requestAnimationFrame(nushiLoop);
+}
+function drawNushi(){
+  const cv2=$('nushiCv'); if(!cv2.getContext) return;
+  const o=cv2.getContext('2d'); o.clearRect(0,0,220,34);
+  o.fillStyle='#0c2238'; o.fillRect(4,10,212,14);
+  const [lo,hi]=nushi.zone;
+  o.fillStyle='#ffd97a'; o.fillRect(4+lo*2.12, 10, (hi-lo)*2.12, 14);
+  o.fillStyle='#fff'; o.fillRect(4+nushi.pos*2.12-1, 6, 3, 22);
+  o.fillStyle='#7fe7d4'; o.font='10px monospace';
+  o.fillText('HIT '+nushi.hits+'/3', 6, 8);
+  o.fillStyle='#ff9eba';
+  o.fillText('にげる '+nushi.miss+'/3', 150, 8);
+}
+function nushiTap(){
+  if(!nushi) return;
+  const inZone = nushi.pos>=nushi.zone[0] && nushi.pos<=nushi.zone[1];
+  if(inZone){
+    nushi.hits++;
+    blip([523,659],'triangle',.18);
+    $('nushiInfo').textContent='いいぞ! 食いついた!! ('+nushi.hits+'/3)';
+    nushi.speed*=1.25;                       // だんだん速くなる
+    const w=Math.max(10, (nushi.zone[1]-nushi.zone[0])-3);
+    const lo=8+Math.random()*(100-16-w);
+    nushi.zone=[lo,lo+w];
+    if(nushi.hits>=3){ nushiCatch(); return; }
+  } else {
+    nushi.miss++;
+    blip([220,185],'sawtooth',.18);
+    $('nushiInfo').textContent='はずした…! 糸が切れそうだ('+nushi.miss+'/3)';
+    if(nushi.miss>=3){ nushiEscape(); return; }
+  }
+  drawNushi();
+}
+function nushiCatch(){
+  const c=CREATURES.find(x=>x.id===nushi.cid);
+  cancelAnimationFrame(nushi.raf); nushi=null;
+  $('nushiModal').classList.remove('open');
+  const isNew=!S.dex[c.id];
+  S.dex[c.id]=(S.dex[c.id]||0)+1;
+  if(isNew){ S.g+=c.bounty; showDiscover(c, c.bounty, true); }
+  toast(`🎣 ${c.name}を釣り上げた!!`);
+  asgDirty=true; refreshHud(); persist();
+}
+function nushiEscape(){
+  const c=CREATURES.find(x=>x.id===nushi.cid);
+  cancelAnimationFrame(nushi.raf); nushi=null;
+  $('nushiModal').classList.remove('open');
+  toast(`💨 ${c.name}は深みへ消えていった…(また会えるはず)`, true);
+}
+// ---------- 初心者チュートリアル ----------
+let tutCamSeen=0;
+const TUT=[
+  {txt:'ようこそ艦長! まずは画面を上下にドラッグして、ふかい海をのぞいてみよう 👀',
+   ok:()=>{ tutCamSeen=Math.max(tutCamSeen, camY); return tutCamSeen>30; }},
+  {txt:'シャフト横の「+」をタップして、お金を生む【観光カプセル】を建てよう(300G)👆',
+   build:'cap', ok:()=>countB('cap')>=1},
+  {txt:'人手が足りない! 「クルー」タブのガチャ(200G)で新しい仲間をスカウトしよう',
+   glow:'btnCrew', gacha:true, ok:()=>S.crew.length>=3},
+  {txt:'つぎは【研究ラボ】!研究ptは海域の解放や上位施設に必要だ 🧪',
+   build:'lab', ok:()=>countB('lab')>=1},
+  {txt:'クルーが働きはじめた!「クルー」タブで体力と調子をチェックしよう',
+   glow:'btnCrew', ok:()=>$('crewPanel').classList.contains('open')},
+  {txt:'「潜水艇」タブから陽光帯へ出航!深海の生物をさがしに行こう 🌊',
+   glow:'btnSub', ok:()=>S.exps.length>0 || (S.life.exp||0)>0},
+  {txt:'探索のあいだも収入は貯まる。「潜水艇」タブの⚡ボタンですぐ帰還もOK(いまは無料!)',
+   ok:()=>discCount()>=1},
+  {txt:'働きづめのクルーは疲れてしまう…【休憩室】を建ててケアしよう 🛏',
+   build:'rest', ok:()=>countB('rest')>=1},
+];
+// チュートリアル中の強制:いま建てるべき施設/ガチャ可否
+const eventAllowed = () => S.tut>=99 && Date.now() - (S.tutDoneAt||0) > 5*60*1000 && !wkIs('nagi');
+const tutReq   = () => (S.started && S.tut<99 && TUT[S.tut]) ? (TUT[S.tut].build||null) : null;
+const tutGacha = () => !(S.started && S.tut<99) || !!(TUT[S.tut] && TUT[S.tut].gacha);
+let tutStuck=0;
+function tutTick(){
+  if(!S.started || S.tut>=99) return;
+  $('tutBox').style.display='block';
+  if(S.tut>=TUT.length){ tutDone(); return; }
+  const st=TUT[S.tut];
+  $('tutStep').textContent=`チュートリアル ${S.tut+1}/${TUT.length}`;
+  $('tutText').textContent=st.txt;
+  ['btnSub','btnCrew','btnDex','btnMis','btnHelp'].forEach(id=>{ const el=$(id); if(el&&el.classList) el.classList.remove('tutGlow'); });
+  if(st.glow && $(st.glow).classList) $(st.glow).classList.add('tutGlow');
+  if(st.ok()){
+    S.tut++; tutStuck=0;
+    blip([659,880],'triangle',.15);
+    if(S.tut>=TUT.length) tutDone();
+  } else {
+    // 救済:建設/ガチャ資金が足りないまま45秒たったら本部から補助金
+    const needG = st.build ? BTYPES[st.build].cost : (st.gacha ? 200 : 0);
+    if(needG && S.g<needG){ if(++tutStuck>=45){ tutStuck=0; S.g+=150; toast('📦 本部から補助金150Gがとどいた!'); refreshHud(); } }
+    else tutStuck=0;
+  }
+}
+function tutDone(){
+  S.tut=99; S.tutDoneAt=Date.now();
+  $('tutBox').style.display='none';
+  ['btnSub','btnCrew','btnDex','btnMis','btnHelp'].forEach(id=>{ const el=$(id); if(el&&el.classList) el.classList.remove('tutGlow'); });
+  S.g+=200; S.tickets+=1;
+  toast('🎓 チュートリアル完了! ごほうびに200Gとガチャチケットをプレゼント!\nあとは自由に経営しよう。ミッション報酬もお忘れなく!');
+  blip([523,659,784,1047,1319],'triangle',.3);
+  refreshHud(); persist();
+}
+// ---------- 依頼クエスト ----------
+const QSRC=['海洋博物館','みなと水族館','テレビ局','なぞの富豪','深海研究所'];
+let questCool=15;
+function genQuest(){
+  const pool=CREATURES.filter(c=>!c.hidden && !c.boss && c.kind!=='obj' && c.z<S.zoneUnlocked && c.rare<=4);
+  if(!pool.length) return null;
+  const c=pool[Math.floor(Math.random()*pool.length)];
+  const g=[0,300,600,1200,2500][c.rare] * (wkIs('tairyo')?2:0+1);
+  const tk=c.rare>=3?1:0;
+  return {cid:c.id, src:QSRC[Math.floor(Math.random()*QSRC.length)],
+          g, tk, until: Date.now() + (wkIs('tairyo')?5:10)*60*1000};
+}
+function questTick(){
+  if(!S.started) return;
+  if(S.tut<99 || Date.now() - (S.tutDoneAt||0) < 60*1000) return;   // チュートリアル中はお知らせを控える
+  if(S.quest){
+    if(Date.now()>S.quest.until){
+      const c=CREATURES.find(x=>x.id===S.quest.cid);
+      toast(`📦 期限切れ…${c?c.name:'?'}の依頼は流れてしまった`, true);
+      S.quest=null; questCool=45;
+    }
+  } else if(--questCool<=0){
+    S.quest=genQuest();
+    if(S.quest){
+      const c=CREATURES.find(x=>x.id===S.quest.cid);
+      toast(`📦 新しい依頼! ${S.quest.src}が「${c.name}」のサンプルを求めている(報酬${fmt(S.quest.g)}G${S.quest.tk?'+チケット':''})`);
+      blip([659,784],'triangle',.15);
+    } else questCool=30;
+  }
+}
+function questHit(pick){
+  if(!S.quest || S.quest.cid!==pick.id) return;
+  S.g += S.quest.g; S.tickets += S.quest.tk;
+  const c=CREATURES.find(x=>x.id===pick.id);
+  toast(`📦✨ 依頼達成! ${S.quest.src}に${c.name}を届けた(+${fmt(S.quest.g)}G${S.quest.tk?` +チケット${S.quest.tk}`:''})`);
+  blip([523,659,784,1047],'triangle',.25);
+  S.quest=null; questCool=60;
+  wkcCount('quest');
+}
+// ---------- 周回(新天地への移転) ----------
+// ふか石はショップで使う通貨。系統を選んで永続強化(周回ビルド)
+const RELICSHOP={
+  tour:{icon:'💰', name:'観光の心得',   d:lv=>`観光収入 +${5*lv}%`},
+  res: {icon:'🧪', name:'研究の心得',   d:lv=>`研究効率 +${5*lv}%`},
+  exp: {icon:'🚢', name:'探索の心得',   d:lv=>`潜航時間 -${4*lv}%・派遣費 -${5*lv}%`},
+  crew:{icon:'💪', name:'船員の心得',   d:lv=>`体力消耗 -${5*lv}%・発病率 -${8*lv}%`},
+  luck:{icon:'🍀', name:'幸運の心得',   d:lv=>`レア発見率 +${4*lv}%`},
+};
+const RELIC_MAXLV=5;
+const relicLv  = k => (S.relicUp&&S.relicUp[k])||0;
+const relicCost= k => relicLv(k)+1;            // Lv1=1個, Lv2=2個…計15個でカンスト
+const relicMul     = () => 1 + 0.05*relicLv('tour');
+const relicResMul  = () => 1 + 0.05*relicLv('res');
+const relicExpTime = () => 1 - 0.04*relicLv('exp');
+const relicExpCost = () => 1 - 0.05*relicLv('exp');
+const relicDrain   = () => 1 - 0.05*relicLv('crew');
+const relicSick    = () => 1 - 0.08*relicLv('crew');
+const relicLuck    = () => 0.04*relicLv('luck');
+// 移転時に得られるふか石:図鑑の発見数と累計収入で決まる
+function relicGain(){
+  return Math.max(1, Math.floor(discCount()/8) + Math.floor(Math.sqrt((S.life.earn||0)/20000)));
+}
+const canPrestige = () => S.zoneUnlocked>=4;
+function doPrestige(){
+  if(!canPrestige()) return;
+  const gain=relicGain();
+  S.relics=(S.relics||0)+gain;
+  S.gen=(S.gen||1)+1;
+  // リセット:資産・施設・海域・艦隊・クルー(人魚は伝説なので同行)
+  S.g=800; S.r=0; S.parts=0;   // 立ち上げ資金も少し手厚く
+  S.zoneUnlocked=1; S.subs=1; S.exps=[]; S.abyssExp=null;   // 深度(S.abyss)は引き継がれる!
+  S.items={}; S.buffs={speed:0,gold:0,luck2:0}; S.lucky=false; S.quest=null; questCool=20; S.tut=99;
+  S.slots.forEach(s=>{ s.b=null; s.blv=1; s.owned=(s.pos===1); });
+  const mer=S.crew.find(c=>c.mermaid);
+  S.crew = mer ? [mer] : [];
+  // 新天地の立ち上げスタッフ2人を本部が派遣(移転直後の人手詰み=操縦士確保でカプセル無人を防ぐ)
+  S.crew.push(genCrew(2), genCrew(2));
+  S.crewCap = 4 + (mer?1:0);
+  if(S.event) endEvent();
+  tourists=[]; ferry.state='away'; ferry.cool=60;
+  camX=0; camY=0;
+  asgDirty=true;
+  // 演出:画面いっぱいの泡+ホワイトアウト
+  for(let i=0;i<40;i++) fxBubbles(camX+Math.random()*VW, camY+VH+10, 2, {dur:1.6});
+  const f=document.createElement('div'); f.className='flashFx'; document.body.appendChild(f);
+  setTimeout(()=>f.remove(), 600);
+  toast(`🚀 新天地へ移転! 本部から立ち上げスタッフ2人が合流!\nふか石×${gain}を獲得(累計${S.relics})\n観光収入と研究が永続 +${(S.relics*2)}%!`);
+  blip([392,494,587,784,988],'triangle',.3);
+  persist(); closePanels(); refreshHud();
+}
+// いま出航していない操縦士(次の出航に使える)
+function freePilot(){
+  const A=assignments();
+  return A.pilots.find(p=> !S.exps.some(e=>e.pid===p.id) && !(S.abyssExp && S.abyssExp.pid===p.id)) || null;
+}
+const fleetBusy = () => S.exps.length + (S.abyssExp?1:0);
+// ---------- 週替わりチャレンジ ----------
+const WK_RULES=[
+  {id:'ooshike',  icon:'🌊', name:'大しけ週間',   desc:'イベント発生2倍/観光収入+30%',          goal:{type:'guest', n:60, label:'観光客60人をむかえる'}, rw:{tk:2, g:500}},
+  {id:'kenkyufes',icon:'🧪', name:'研究フェス',   desc:'研究効率+50%',                          goal:{type:'exp',   n:25, label:'探索を25回おこなう'},   rw:{tk:2, g:500}},
+  {id:'omatsuri', icon:'🎆', name:'お祭りウィーク',desc:'フェリーの来客+2人/便',                 goal:{type:'guest', n:90, label:'観光客90人をむかえる'}, rw:{tk:2, parts:3}},
+  {id:'rush',     icon:'💎', name:'ふか石ラッシュ',desc:'未踏深層の節目が500mごと/挑戦費+50%',   goal:{type:'dive',  n:8,  label:'未踏深層に8回挑む'},   rw:{tk:3}},
+  {id:'nagi',     icon:'🕊', name:'凪の週',       desc:'イベントなし/潜航時間-25%',             goal:{type:'exp',   n:30, label:'探索を30回おこなう'},   rw:{tk:2, g:500}},
+  {id:'tairyo',   icon:'🎣', name:'大漁週間',     desc:'依頼の報酬2倍/期限は半分の5分',         goal:{type:'quest', n:5,  label:'依頼を5件達成する'},    rw:{tk:2, g:800}},
+];
+const wkNum  = () => Math.floor(Date.now()/(7*86400e3));
+const wkKey  = () => 'w'+wkNum();
+const wkRule = () => WK_RULES[wkNum() % WK_RULES.length];
+const wkIs   = id => wkRule().id===id;
+function wkcRoll(){
+  if(S.wkc.key!==wkKey()){
+    S.wkc={key:wkKey(), n:0, done:false};
+    const r=wkRule();
+    if(S.started && S.tut>=99) toast(`📅 今週のチャレンジ「${r.icon}${r.name}」開始!\n${r.desc}／目標:${r.goal.label}`);
+  }
+}
+function wkcCount(type, n=1){
+  wkcRoll();
+  const r=wkRule();
+  if(S.wkc.done || r.goal.type!==type) return;
+  S.wkc.n += n;
+  if(S.wkc.n >= r.goal.n){
+    S.wkc.done=true;
+    const rw=r.rw;
+    if(rw.g) S.g+=rw.g;
+    if(rw.tk) S.tickets=(S.tickets||0)+rw.tk;
+    if(rw.parts) S.parts+=rw.parts;
+    toast(`📅✨ 今週のチャレンジ達成!「${r.goal.label}」\n報酬:${rw.g?'+'+fmt(rw.g)+'G ':''}${rw.tk?'チケット×'+rw.tk+' ':''}${rw.parts?'パーツ×'+rw.parts:''}`);
+    blip([523,659,784,1047],'triangle',.25);
+  }
+}
+// ---------- ⚡いますぐ帰還(放置の救済) ----------
+function canFreeWarp(){
+  if(S.tut<99) return true;                       // チュートリアル中はいつでも無料
+  if(S.freeWarp.key!==dayKey()) return true;      // きょう未使用
+  return !S.freeWarp.used;
+}
+function consumeFreeWarp(){
+  if(S.tut<99) return;                            // チュートリアル中は消費しない
+  S.freeWarp={key:dayKey(), used:true};
+}
+function warpCost(rem, zone){                      // 基本料金:残り時間×深さ
+  // 連打対策:探索1回の持ち帰り期待値(依頼・新種・アイテム)を必ず上回る料金にする
+  return Math.max(100, Math.ceil(rem * (zone+1) * 2));
+}
+// 層ごと×日ごとの倍々課金:同じ層で帰還するたび、次の料金が2倍になる(無料帰還も回数に数える)
+function rollWarpN(){
+  if(S.warpN.key!==dayKey()) S.warpN={key:dayKey(), n:[0,0,0,0,0]};
+}
+function warpUses(idx){ rollWarpN(); return S.warpN.n[idx]||0; }
+function warpCostNow(rem, zone, idx){
+  return warpCost(rem, zone) * Math.pow(2, warpUses(idx));
+}
+function countWarp(idx){ rollWarpN(); S.warpN.n[idx]=(S.warpN.n[idx]||0)+1; }
+function instantReturn(i){                         // 通常探索のi番目を即帰還
+  const e=S.exps[i]; if(!e) return;
+  const rem=Math.max(0, Math.ceil((e.t0+e.dur*1000-Date.now())/1000));
+  if(canFreeWarp()) consumeFreeWarp();
+  else {
+    const c=warpCostNow(rem, e.zone, e.zone);
+    if(S.g<c) return;
+    S.g-=c;
+  }
+  countWarp(e.zone);
+  resolveExp(i);
+  blip([784,1047],'triangle',.18);
+  renderSub(); refreshHud();
+}
+function instantAbyssReturn(){                     // 深層の即帰還(独立カウンタ:idx4)
+  const e=S.abyssExp; if(!e) return;
+  const rem=Math.max(0, Math.ceil((e.t0+e.dur*1000-Date.now())/1000));
+  if(canFreeWarp()) consumeFreeWarp();
+  else {
+    const c=warpCostNow(rem, 3, 4);
+    if(S.g<c) return;
+    S.g-=c;
+  }
+  countWarp(4);
+  resolveAbyss();
+  blip([784,1047],'triangle',.18);
+  renderSub(); refreshHud();
+}
+// ---------- エンドレス深度:未踏深層 ----------
+const abyssCost = () => Math.round((150 + Math.floor((S.abyss.d||0)/8)) * (wkIs('rush')?1.5:1));
+const abyssMile = () => wkIs('rush') ? 500 : 1000;
+const abyssTime = () => Math.min(60, Math.round((25 + (S.abyss.d||0)/200) * relicExpTime()));
+function startAbyss(){
+  const p=freePilot();
+  if(!p || fleetBusy()>=S.subs || S.g<abyssCost() || S.zoneUnlocked<4 || S.abyssExp) return;
+  S.g-=abyssCost();
+  S.abyssExp={t0:Date.now(), dur:abyssTime(), pid:p.id};
+  toast(`🕳 ${p.name}が未踏深層へ降下を開始…(${S.abyss.d}m地点から)`);
+  blip([220,196,174],'triangle',.2);
+  renderSub(); refreshHud();
+}
+function resolveAbyss(){
+  const e=S.abyssExp; S.abyssExp=null;
+  const pilot=S.crew.find(c=>c.id===e.pid)||null;
+  const genMul = 1 + 0.1*((S.gen||1)-1);                       // 世代が進むほど掘削が速い
+  const gain = Math.round((90+Math.random()*40) * (1+(pilot?pilot.stats.pilot:0)*0.04) * genMul);
+  const prevK = Math.floor(S.abyss.d/abyssMile());
+  S.abyss.d += gain;
+  S.abyss.best = Math.max(S.abyss.best, S.abyss.d);
+  const newK = Math.floor(S.abyss.d/abyssMile());
+  const g=Math.round(gain*2.5), r=Math.round(gain*0.8);   // 報酬は掘削量ベース:深くなるほど挑戦費が上回り「ふか石のための投資」になる
+  S.g+=g; S.r+=r; S.life.earn=(S.life.earn||0)+g;
+  if(pilot){ gainXp(pilot,12); if(!pilot.mermaid) pilot.hp=Math.max(0,pilot.hp-10); }
+  toast(`🕳 深度 ${fmt(S.abyss.d)}m に到達! (+${gain}m)
+未知のサンプルを回収:+${fmt(g)}G +${fmt(r)}研究`);
+  if(newK>prevK){
+    const got=newK-prevK;
+    S.relics=(S.relics||0)+got;
+    toast(`💎 ${fmt(newK*abyssMile())}mの節目を突破!! 深層のふか石×${got}を発見!`);
+    blip([392,494,587,784],'triangle',.3);
+  } else blip([262,330,392],'triangle',.2);
+  wkcCount('dive');
+  asgDirty=true; refreshHud(); persist();
+}
+// 施設が稼働しているか(クルー不要施設は常時稼働)
+function facOn(s){
+  const b=BTYPES[s.b]; if(!b) return false;
+  if(!b.crew) return true;
+  if(s.b==='cap'||s.b==='lab') return true;  // 個別に担当判定される
+  return !!assignments().staff[slotId(s)];
+}
+const facStaff = s => assignments().staff[slotId(s)] || null;
+// 施設ごとの「効く能力」:担当クルーの能力が高いほど効果UP(+6%/pt)
+const FACSTAT = {
+  light:'pilot', dock2:'pilot', subfac:'pilot',
+  restaurant:'tour', miyage:'tour', onsen:'tour', spring:'tour',
+  train:'res', garden:'res', vault:'res', plab:'res', gate:'res', tank:'res',
+  game:'humor', ad:'humor', gym:'humor', hall:'humor', casino:'humor',
+};
+function staffMul(s){
+  const k=FACSTAT[s.b]; if(!k) return 1;
+  const st=facStaff(s); if(!st || !st.length) return 1;
+  const avg = st.reduce((a,c)=> a + (c.stats[k]||0), 0) / st.length;
+  return 1 + 0.06*avg;
+}
+const effOf = c => 0.4 + 0.6*(c.hp/100);   // 体力による仕事効率(40%〜100%)
+const DEXB = {1:0.3, 2:0.6, 3:1.0, 4:1.6, 5:2.6};   // レア度ごとの人気(収入ボーナス/秒)
+const popOf = c => c.pop!==undefined ? c.pop : (c.hidden ? 5.0 : DEXB[c.rare]);
+const dexBonus = () => CREATURES.reduce((a,c)=> a + (S.dex[c.id] ? popOf(c) : 0), 0);
+const tankMul     = () => 1 + facPow('tank', 0.08);
+const capIncomeOf = c => (2 + dexBonus()*tankMul()) * (1 + c.stats.tour*0.15);
+const labOutOf    = c => 1 + c.stats.res*0.25;
+const lvMult      = s => 1 + 0.08*(s.blv-1);   // +8%/Lv(Lv20で×2.52)
+const lightPow    = () => S.slots.filter(s=>s.b==='light' && facOn(s)).reduce((a,s)=> a + 0.08*lvMult(s)*staffMul(s), 0);
+const facPow      = (k,per) => S.slots.filter(s=>s.b===k && facOn(s)).reduce((a,s)=> a + per*lvMult(s)*staffMul(s), 0);
+const gatePow     = () => facPow('gate', 0.15);
+const adPow       = () => S.slots.filter(s=>s.b==='ad' && facOn(s)).reduce((a,s)=> a + lvMult(s)*staffMul(s), 0);
+const dockDisc    = () => Math.min(0.5, facPow('dock2', 0.10));
+const subSpeedMul = () => Math.max(0.6, 1 - facPow('subfac', 0.05));
+const expCostOf   = z => Math.max(10, Math.round(z.expCost * (1 - dockDisc()) * relicExpCost()));
+const vaultEff    = () => Math.min(0.9, 0.5 + facPow('vault', 0.10));
+const plabMul     = () => 1 + facPow('plab', 0.10);
+
+// ---------- items & buffs ----------
+const ITEMS={
+  chart:{name:'海流チャート',       icon:'🌀', desc:'90秒間 潜航時間-40%',   buff:'speed', dur:90},
+  charm:{name:'サンゴのお守り',     icon:'🪸', desc:'90秒間 観光収入+50%',   buff:'gold',  dur:90},
+  plank:{name:'発光プランクトン',   icon:'✨', desc:'90秒間 レア率×2',       buff:'luck2', dur:90},
+};
+const ITEM_DROP_RATE = 0.3;            // 探索でアイテムが見つかる確率
+const buffOn = k => Date.now() < (S.buffs[k]||0);
+function useItem(id){
+  if(!S.items[id]) return;
+  S.items[id]--;
+  const it=ITEMS[id];
+  S.buffs[it.buff] = Math.max(Date.now(), S.buffs[it.buff]||0) + it.dur*1000;  // 重ね使いで延長
+  toast(`${it.icon} ${it.name}を使った! ${it.desc}`);
+  blip([659,880],'triangle');
+  refreshHud();
+}
+function rollDrop(z){
+  // 深い海域ほど良いアイテムが出やすい
+  const table=[
+    {id:'parts',  w:40},
+    {id:'coin',   w:20},
+    {id:'sample', w:13},
+    {id:'chart',  w:9},
+    {id:'charm',  w:9},
+    {id:'plank',  w:5 + z*2},
+    {id:'pearl',  w:1 + z},
+  ];
+  let r=Math.random()*table.reduce((a,d)=>a+d.w,0);
+  let pick=table[0];
+  for(const d of table){ r-=d.w; if(r<=0){ pick=d; break; } }
+  if(pick.id==='parts'){
+    const n=1+(z>=2?1:0); S.parts+=n;
+    toast(`🔧 強化パーツ ×${n} を回収した`);
+  } else if(pick.id==='coin'){
+    const v=300 + z*200 + Math.floor(Math.random()*200); S.g+=v;
+    toast(`🪙 古代のコインを発見! +${v}G`);
+  } else if(pick.id==='sample'){
+    const v=60 + z*30; S.r+=v;
+    toast(`🧪 貴重な研究サンプル! 研究+${v}pt`);
+  } else if(pick.id==='pearl'){
+    S.tickets++;
+    toast('🦪 美しい真珠…! ガチャチケット+1');
+  } else {
+    S.items[pick.id]=(S.items[pick.id]||0)+1;
+    toast(`${ITEMS[pick.id].icon} ${ITEMS[pick.id].name}を見つけた!(倉庫へ)`);
+  }
+}
+
+// ---------- canvas setup ----------
+const cv = document.getElementById('game');
+const ctx = cv.getContext('2d');
+let SC = 3, VW = 160, VH = 240, camY = 0, camX = 0;
+function camXMax(){ return Math.max(0, 7 + 30 + (MAXPOS-1)*32 + 6 - VW/2); }
+
+function resize(){
+  const w = cv.clientWidth, h = cv.clientHeight;
+  // 横画面では高さ基準も考慮してズームしすぎを防ぐ
+  SC = Math.max(2, Math.min(Math.floor(w/170), Math.max(2, Math.floor(h/130))));
+  VW = Math.ceil(w/SC); VH = Math.ceil(h/SC);
+  cv.width = VW*SC; cv.height = VH*SC;
+  ctx.imageSmoothingEnabled = false;
+  camY = Math.min(Math.max(camY, 0), Math.max(0, WORLD_BOTTOM - VH + 10));
+  camX = Math.min(Math.max(camX, -camXMax()), camXMax());
+}
+window.addEventListener('resize', resize);
+window.addEventListener('orientationchange', ()=> setTimeout(resize, 120));
+resize();
+const CX = () => (VW>>1);
+
+// ---------- sprite prerender ----------
+function makeSprite(c){
+  const w = Math.max(...c.px.map(r=>r.length)), h = c.px.length;
+  const oc = document.createElement('canvas'); oc.width=w; oc.height=h;
+  const o = oc.getContext('2d');
+  c.px.forEach((row,y)=>{ [...row].forEach((ch,x)=>{
+    if(ch!=='.' && c.pal[ch]){ o.fillStyle=c.pal[ch]; o.fillRect(x,y,1,1); }
+  });});
+  return oc;
+}
+const SPR = {}; CREATURES.forEach(c=> SPR[c.id]=makeSprite(c));
+function silhouette(c){
+  const s = SPR[c.id], oc = document.createElement('canvas');
+  oc.width=s.width; oc.height=s.height;
+  const o=oc.getContext('2d'); o.drawImage(s,0,0);
+  o.globalCompositeOperation='source-in'; o.fillStyle='#142438'; o.fillRect(0,0,s.width,s.height);
+  return oc;
+}
+
+// ---------- ambient ----------
+const snow = Array.from({length:90},()=>({x:Math.random(),y:Math.random()*WORLD_BOTTOM,v:.04+Math.random()*.12}));
+let bubbles = [];
+let swimmers = [];
+
+// ---------- tourists & ferry ----------
+let tourists = [], floaters = [];
+let ferry = {x:-60, state:'away', wait:0, cool:240};
+const TSHIRT = ['#cf4f3e','#3fa37a','#5b79c9','#d99a3d','#c77ddb','#e87aa0'];
+function drawPerson(x,y,shirt){
+  ctx.fillStyle='#2c2620'; ctx.fillRect(x+1,y,4,2);
+  ctx.fillStyle='#ffd9b0'; ctx.fillRect(x+1,y+2,4,2);
+  ctx.fillStyle=shirt;     ctx.fillRect(x,y+4,6,3);
+  ctx.fillStyle='#243240'; ctx.fillRect(x+1,y+7,1,2); ctx.fillRect(x+4,y+7,1,2);
+}
+function spawnSwimmer(){
+  const pool = CREATURES.filter(c=> S.dex[c.id] && c.z < S.zoneUnlocked && c.kind!=='obj');
+  if(!pool.length || swimmers.length>=9) return;
+  const c = pool[Math.floor(Math.random()*pool.length)];
+  const dir = Math.random()<.5?-1:1;
+  const yTop = zoneTopY(c.z)+6, yBot = zoneTopY(c.z)+LVPERZONE*LH-6;
+  swimmers.push({c, x: dir<0? VW+20 : -20, y: yTop+Math.random()*(yBot-yTop),
+                 vx: dir<0? -(.1+Math.random()*.18) : (.1+Math.random()*.18), ph: Math.random()*7});
+}
+setInterval(spawnSwimmer, 2600);
+
+// ---------- input ----------
+let drag=null;
+cv.addEventListener('pointerdown', e=>{ drag={x:e.clientX, y:e.clientY, cx0:camX, cy0:camY, moved:false}; });
+// ラバーバンド/プル更新の最終防衛(パネル内スクロールとセーブ欄は許可)
+document.addEventListener('touchmove', e=>{
+  if(!(e.target.closest && e.target.closest('.pBody, textarea'))) e.preventDefault();
+}, {passive:false});
+window.addEventListener('pointermove', e=>{
+  if(!drag) return;
+  const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+  if(Math.abs(dy)>6 || Math.abs(dx)>6) drag.moved=true;
+  camY = Math.min(Math.max(drag.cy0 - dy/SC, 0), Math.max(0, WORLD_BOTTOM - VH + 10));
+  camX = Math.min(Math.max(drag.cx0 - dx/SC, -camXMax()), camXMax());
+});
+window.addEventListener('pointerup', e=>{
+  if(drag && !drag.moved) tap((e.clientX - cv.getBoundingClientRect().left)/SC + camX, e.clientY/SC + camY);
+  drag=null;
+});
+
+function slotRect(s){
+  const w=30, h=24, cx=CX();
+  const off = 7 + (s.pos-1)*32;
+  const x = s.side<0 ? cx-off-w : cx+off;
+  return {x, y: rowY(s.zone,s.lv), w, h};
+}
+let pickedSlot=null;
+function tap(x,y){
+  if(!S.started) return;
+  for(const s of S.slots){
+    if(s.zone >= S.zoneUnlocked) continue;
+    if(!s.owned && !slotPurchasable(s)) continue;
+    const r = slotRect(s);
+    if(x>=r.x && x<=r.x+r.w && y>=r.y && y<=r.y+r.h){
+      if(s.b==='__ext'){   // 大型施設の外側半分→本体を開く
+        const base=S.slots.find(o=>o.zone===s.zone && o.lv===s.lv && o.side===s.side && o.pos===s.pos-1);
+        if(base && base.b){ pickedSlot=base; renderMod(); openPanel('modPanel'); }
+        return;
+      }
+      pickedSlot=s;
+      if(!s.owned){ renderSlotBuy(); openPanel('modPanel'); }
+      else if(s.b){ renderMod(); openPanel('modPanel'); }
+      else { renderBuild(); openPanel('buildPanel'); }
+      return;
+    }
+  }
+}
+
+// ---------- 演出パーティクル(ジュース) ----------
+const FX=[];   // {x,y,vx,vy,life,max,col,txt?,sz?}
+function fxBurst(x, y, n, cols, opt={}){
+  for(let i=0;i<n;i++){
+    const a=Math.random()*Math.PI*2, sp=(opt.sp||26)*(0.4+Math.random()*0.9);
+    FX.push({x, y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-(opt.up||18), life:0,
+             max:(opt.dur||0.7)*(0.7+Math.random()*0.6),
+             col:cols[Math.floor(Math.random()*cols.length)], sz:opt.sz||2, g:opt.g!==undefined?opt.g:46});
+  }
+}
+function fxBubbles(x, y, n, opt={}){   // ふわっと上がる泡
+  for(let i=0;i<n;i++){
+    FX.push({x:x+(Math.random()-0.5)*(opt.w||18), y:y+(Math.random()-0.5)*6,
+             vx:(Math.random()-0.5)*6, vy:-(14+Math.random()*22), life:0,
+             max:(opt.dur||1.1)*(0.6+Math.random()*0.8), col:opt.col||'rgba(200,240,255,.8)', sz:1+(Math.random()<.3?1:0), g:-4});
+  }
+}
+function fxText(x, y, txt, col){
+  FX.push({x, y, vx:0, vy:-16, life:0, max:1.0, col, txt, g:0});
+}
+function fxDraw(ctx, dt){
+  for(let i=FX.length-1; i>=0; i--){
+    const p=FX[i];
+    p.life+=dt;
+    if(p.life>=p.max){ FX.splice(i,1); continue; }
+    p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=(p.g||0)*dt;
+    const k=1-p.life/p.max;
+    ctx.globalAlpha=Math.min(1, k*1.6);
+    if(p.txt){
+      ctx.fillStyle=p.col; ctx.font='bold 8px sans-serif';
+      ctx.fillText(p.txt, p.x, p.y);
+    } else {
+      ctx.fillStyle=p.col;
+      ctx.fillRect(p.x, p.y, p.sz, p.sz);
+    }
+    ctx.globalAlpha=1;
+  }
+}
+// 建設・強化の祝いをスロット位置で
+function fxBuildPop(s){
+  const r=slotRect(s);
+  s.__bornT=Date.now();
+  fxBurst(r.x+r.w/2, r.y+r.h, 14, ['#cfe0ff','#9fdcff','#fff'], {sp:34, up:26});
+  fxBubbles(r.x+r.w/2, r.y+r.h/2, 8, {w:r.w});
+  fxText(r.x+r.w/2-10, r.y-4, 'ポン!', '#ffe6a3');
+  blip([392,523,659],'triangle',.18);
+}
+function fxUpgrade(s){
+  const r=slotRect(s);
+  s.__upT=Date.now();
+  if(s.blv>=20){   // Lv20:金の祝福
+    fxBurst(r.x+r.w/2, r.y+r.h/2, 34, ['#ffd97a','#fff3b0','#fff','#ffb84d'], {sp:55, up:30, dur:1.2, sz:2});
+    fxText(r.x+r.w/2-22, r.y-6, '✦ MAX LEVEL ✦', '#ffd97a');
+    const f=document.createElement('div'); f.className='flashFx'; document.body.appendChild(f);
+    setTimeout(()=>f.remove(), 600);
+    blip([523,659,784,1047,1319,1568],'triangle',.3);
+    toast(`👑 ${BTYPES[s.b].name}がLv.20(最高位)に到達!!`);
+  } else {
+    fxBurst(r.x+r.w/2, r.y+r.h/2, 12, ['#ffd97a','#fff3b0'], {sp:36, up:20});
+    fxText(r.x+r.w/2-12, r.y-4, 'Lv.'+s.blv+'!', '#ffd97a');
+    blip([659,784,988],'triangle',.16);
+  }
+}
+// 建てたてのビルは下からポヨンと生える(描画側で使うスケール)
+function bornScale(s){
+  if(!s.__bornT) return 1;
+  const a=(Date.now()-s.__bornT)/1000;
+  if(a>0.62){ return 1; }
+  // 0→1.12→0.96→1 のバウンス
+  if(a<0.28) return (a/0.28)*1.12;
+  if(a<0.46) return 1.12-((a-0.28)/0.18)*0.16;
+  return 0.96+((a-0.46)/0.16)*0.04;
+}
+function upFlash(s){   // 強化直後の白フラッシュ係数(0〜1)
+  if(!s.__upT) return 0;
+  const a=(Date.now()-s.__upT)/1000;
+  return a<0.35 ? 1-a/0.35 : 0;
+}
+// ---------- UI helpers ----------
+const $ = id => document.getElementById(id);
+function openPanel(id){ document.querySelectorAll('.panel').forEach(p=>p.classList.remove('open')); $(id).classList.add('open'); }
+function closePanels(){ document.querySelectorAll('.panel').forEach(p=>p.classList.remove('open')); }
+document.querySelectorAll('.pClose').forEach(b=> b.onclick=()=> closePanels());
+$('btnSub').onclick = ()=>{ renderSub(); openPanel('subPanel'); };
+$('btnDex').onclick = ()=>{ renderDex(); openPanel('dexPanel'); };
+function renderGuestReport(){
+  rollGuests();
+  const g=S.guests, diff=g.n-(g.prev||0);
+  const mark = diff>0 ? `<span style="color:#7fe7d4">▲+${fmt(diff)}</span>`
+             : diff<0 ? `<span style="color:#ff9eba">▼${fmt(diff)}</span>`
+             : '<span style="color:#6fa3d0">→ ±0</span>';
+  $('guestReport').innerHTML =
+    `きょうの来場：<b>${fmt(g.n)}</b>人<br>` +
+    `きのう：${fmt(g.prev||0)}人(前日比 ${mark})<br>` +
+    `累計来場者：<b style="color:#ffd97a">${fmt(g.total||0)}</b>人`;
+  // 収入スパークライン
+  const cv2=$('incCv'); if(cv2 && cv2.getContext){
+    const o=cv2.getContext('2d'); o.clearRect(0,0,240,40);
+    const h=S.incHist, mx=Math.max(1, ...h);
+    o.fillStyle='#1d3a5f'; o.fillRect(0,39,240,1);
+    o.fillStyle='#7fe7d4';
+    h.forEach((v,i)=>{ const bh=Math.max(1, Math.round(v/mx*36)); o.fillRect(i*4, 40-bh, 3, bh); });
+    o.fillStyle='#9fdcff'; o.font='8px monospace';
+    o.fillText('max '+fmt(Math.round(mx))+'G/s', 4, 9);
+  }
+  // ジャーナル
+  const jl=$('journal');
+  if(jl){
+    jl.innerHTML = (S.log&&S.log.length)
+      ? S.log.map(e=>`<div style="color:${e.w?'#ff9eba':'#9fdcff'}"><span style="color:#56708f">${e.t}</span> ${e.m}</div>`).join('')
+      : '<span style="color:#56708f">まだ出来事はない…</span>';
+  }
+}
+let presArmed=false;
+function renderPrestige(){
+  const ok=canPrestige();
+  $('presInfo').innerHTML = ok
+    ? `第${S.gen}世代／ふか石 <b style="color:#ffd97a">${S.relics}</b>個(収入・研究 +${S.relics*2}%)<br>`+
+      `いま移転すると <b style="color:#ffd97a">ふか石×${relicGain()}</b> を獲得!<br>`+
+      `<span style="color:#ff9eba">※資金・施設・海域・クルー(人魚以外)はリセット。図鑑・実績・ふか石・未踏深層の深度は引き継ぎ</span>`
+    : `第${S.gen}世代／ふか石 ${S.relics}個(収入・研究 +${S.relics*2}%)<br>超深海帯を解放すると移転できる`;
+  const b=$('presBtn');
+  b.disabled=!ok;
+  if(!presArmed) b.textContent='移転する';
+  // レリックショップ
+  const shop=$('relicShop'); shop.innerHTML='';
+  Object.keys(RELICSHOP).forEach(k=>{
+    const def=RELICSHOP[k], lv=relicLv(k), cost=relicCost(k);
+    const row=document.createElement('div');
+    const max= lv>=RELIC_MAXLV;
+    row.innerHTML=`${def.icon} <b>${def.name}</b> Lv.${lv}/${RELIC_MAXLV}　<span style="color:#9fdcff">${def.d(Math.max(lv,1))}</span> `;
+    const btn=document.createElement('button'); btn.className='buyBtn';
+    btn.style.cssText='font-size:11px;padding:3px 8px 2px;margin-left:4px;';
+    btn.textContent = max ? 'MAX' : `ふか石×${cost}`;
+    btn.disabled = max || (S.relics||0)<cost;
+    btn.onclick=()=>{
+      if(relicLv(k)>=RELIC_MAXLV || (S.relics||0)<relicCost(k)) return;
+      S.relics-=relicCost(k); S.relicUp[k]=relicLv(k)+1;
+      toast(`${def.icon} ${def.name} Lv.${S.relicUp[k]}! ${def.d(S.relicUp[k])}`);
+      blip([659,784,988],'triangle',.2);
+      renderPrestige(); refreshHud(); persist();
+    };
+    row.appendChild(btn);
+    shop.appendChild(row);
+  });
+}
+$('presBtn').onclick=()=>{
+  if(!canPrestige()) return;
+  if(!presArmed){ presArmed=true; $('presBtn').textContent='ほんとうに移転する!?'; setTimeout(()=>{ presArmed=false; if($('presBtn')) $('presBtn').textContent='移転する'; }, 4000); return; }
+  presArmed=false; doPrestige(); renderPrestige(); renderGuestReport();
+};
+function showMenuTab(id){
+  document.querySelectorAll('.mtab').forEach(b=> b.classList.toggle('on', b.dataset && b.dataset.mtab===id));
+  ['report','prestige','settings','howto'].forEach(k=> $('mtab-'+k).classList.toggle('on', k===id));
+}
+document.querySelectorAll('.mtab').forEach(b=>{ b.onclick=()=>{ showMenuTab(b.dataset.mtab); blip([659],'triangle',.08); }; });
+$('btnHelp').onclick= ()=>{ showMenuTab('report'); renderGuestReport(); renderPrestige(); openPanel('helpPanel'); };
+$('nushiBtn').onclick=()=> nushiTap();
+$('tutSkip').onclick=()=>{ if(S.tut<99){ S.tut=99; S.tutDoneAt=Date.now(); $('tutBox').style.display='none'; toast('チュートリアルをスキップした(メニューの「あそびかた」も見てね)'); ['btnSub','btnCrew'].forEach(id=>$(id).classList && $(id).classList.remove('tutGlow')); persist(); } };
+
+function toast(msg, warn){
+  const t=document.createElement('div'); t.className='toast'+(warn?' warn':''); t.textContent=msg;
+  $('toasts').appendChild(t); setTimeout(()=>t.remove(), 2600);
+  // ジャーナルに記録
+  if(!S.log) S.log=[];
+  const d=new Date();
+  S.log.unshift({t:('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2), m:String(msg).replace(/\n/g,' '), w:!!warn});
+  if(S.log.length>50) S.log.length=50;
+}
+
+function fmt(n){ return Math.floor(n).toLocaleString('ja-JP'); }
+function yesterdayKey(){ const d=new Date(Date.now()-86400e3); return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
+function rollGuests(){
+  if(S.guests.key!==dayKey()){
+    S.guests={key:dayKey(), n:0,
+      prev: S.guests.key===yesterdayKey() ? S.guests.n : 0,
+      total: S.guests.total||0};
+  }
+}
+function addGuests(n){
+  rollGuests(); wkcCount('guest', n);
+  S.guests.n += n;
+  S.guests.total = (S.guests.total||0) + n;
+}
+function refreshHud(){
+  rollGuests();   // 日付が変わったら0から(昨日ぶんは繰越)
+  $('hV').textContent = fmt(S.guests.n);
+  $('hG').textContent = fmt(S.g);
+  $('hR').textContent = fmt(S.r);
+  $('hC').textContent = S.crew.length + '/' + S.crewCap;
+  $('hP').textContent = fmt(S.parts);
+  $('dexCount').textContent = discCount() + '/' + CREATURES.length;
+  $('subBadge').style.display = (S.started && S.exps.length < S.subs) ? 'block' : 'none';
+  $('misBadge').style.display = (S.started && anyClaim()) ? 'block' : 'none';
+}
+
+// ---------- build panel ----------
+// 建設に必要な研究pt:初期施設は2つ目から、海域2以降の施設は1つ目から必要
+function buildRCost(key){
+  const b=BTYPES[key], n=countB(key);
+  const unit = Math.round(b.cost*0.3);
+  if((b.zone||1)===1) return n===0 ? 0 : unit*n;
+  return unit*(n+1);
+}
+function iconCanvas(draw){
+  const oc=document.createElement('canvas'); oc.width=16; oc.height=16;
+  draw(oc.getContext('2d')); oc.className='ic'; return oc;
+}
+function renderBuild(){
+  const body=$('buildBody'); body.innerHTML='';
+  const extS = pickedSlot ? extOf(pickedSlot) : null;
+  for(const key of Object.keys(BTYPES)){
+    const b=BTYPES[key];
+    const div=document.createElement('div'); div.className='item';
+    const ic=iconCanvas(o=>{ o.fillStyle=b.col; o.fillRect(2,4,12,10); o.fillStyle=b.win; o.fillRect(4,7,3,3); o.fillRect(9,7,3,3); });
+    const tx=document.createElement('div'); tx.className='tx';
+    const needCrew = b.crew>0 ? `／クルー${b.crew}人${FACSTAT[key]?`(相性：${STATN[FACSTAT[key]]})`:''}` : '';
+    const bigTag = b.big ? '<span style="color:#ffd97a">[大型・2マス] </span>' : '';
+    const rc = buildRCost(key);
+    const rcTx = rc>0 ? ` + <span style="color:#7fe7d4">研究${fmt(rc)}pt</span>` : '';
+    tx.innerHTML=`<b>${bigTag}${b.name}</b><small>${b.desc}</small><small>${b.cost}G${rcTx}${needCrew}</small>`;
+    const btn=document.createElement('button'); btn.className='buyBtn'; btn.textContent='建設';
+    const locked = (b.zone||1) > S.zoneUnlocked;
+    const bigNG = b.big && !(extS && extS.owned && !extS.b);
+    if(locked){
+      btn.disabled=true; btn.textContent=ZONES[b.zone-1].name+'解放で';
+      div.style.opacity=.55;
+    } else if(bigNG){
+      btn.disabled=true;
+      tx.innerHTML+='<small style="color:#ff9eba">隣に購入済みの空き枠が必要</small>';
+    } else if(tutReq() && key!==tutReq()){
+      btn.disabled=true; btn.textContent='いまはコレじゃない';
+      div.style.opacity=.5;
+    } else {
+      btn.disabled = S.g<b.cost || S.r<rc || (b.crew>0 && crewNeed()+b.crew > S.crew.filter(c=>!c.sick).length - assignments().pilots.length);
+      if(tutReq()===key && !btn.disabled){ btn.classList.add('tutGlow'); btn.textContent='👆これを建てる!'; }
+    }
+    btn.onclick=()=>{
+      if(!pickedSlot || pickedSlot.b || !pickedSlot.owned) return;
+      const rcNow = buildRCost(key);          // 個数が変わっている可能性があるため再計算
+      if(S.g<b.cost || S.r<rcNow) return;
+      if(b.big){
+        const e=extOf(pickedSlot);
+        if(!(e && e.owned && !e.b)) return;
+        e.b='__ext';
+      }
+      S.g -= b.cost; S.r -= rcNow;
+      pickedSlot.b = key; pickedSlot.blv = 1;
+      fxBuildPop(pickedSlot);
+      if(S.tut<99) setTimeout(tutTick, 50);
+      if(key==='hab') S.crewCap += 2;
+      asgDirty = true;
+      toast(b.name+' を建設した!');
+      closePanels(); refreshHud();
+    };
+    div.append(ic,tx,btn); body.appendChild(div);
+  }
+  if(crewNeed() >= S.crew.filter(c=>!c.sick).length - assignments().pilots.length){
+    const note=document.createElement('div');
+    note.style.cssText='font-size:12px;color:#ff9eba;padding:4px;';
+    note.textContent='※配属できる元気なクルーが足りない!';
+    body.appendChild(note);
+  }
+}
+
+// ---------- slot purchase ----------
+function renderSlotBuy(){
+  const s=pickedSlot, body=$('modBody'); body.innerHTML='';
+  const cost=slotCost(s);
+  const div=document.createElement('div'); div.className='item';
+  const tx=document.createElement('div'); tx.className='tx';
+  tx.innerHTML=`<b>🏗 拡張スロットを購入</b>
+    <small>${ZONES[s.zone].name}・${s.side<0?'左':'右'}側 ${s.pos}マス目</small>
+    <small>フレームを横に延長して建設枠を増やす</small>`;
+  const btn=document.createElement('button'); btn.className='buyBtn gold';
+  btn.textContent=`${fmt(cost)}G で購入`;
+  btn.disabled = S.g < cost || S.tut<99;
+  if(S.tut<99) btn.textContent='チュートリアル後に';
+  btn.onclick=()=>{
+    S.g -= cost; s.owned = true;
+    toast('フレームを延長した! 建設枠が増えた');
+    blip([392,523],'triangle');
+    closePanels(); refreshHud();
+  };
+  div.append(tx,btn); body.appendChild(div);
+}
+
+// ---------- module upgrade panel ----------
+const MAXLV = 20;
+const maxLvOf = s => s.b==='hab' ? 3 : MAXLV;
+function modEffectText(s){
+  const f=lvMult(s), fx=f.toFixed(2);
+  if(s.b==='cap')   return `収入 ×${fx}`;
+  if(s.b==='lab')   return `研究 ×${fx}`;
+  if(s.b==='light') return `レア率 +${(8*f).toFixed(1)}%`;
+  if(s.b==='hab')   return `クルー上限 +${2*s.blv}`;
+  if(s.b==='rest')  return `体力+${f.toFixed(2)}/s(1人)・調子もすこし回復`;
+  if(s.b==='med')   return `治療スピード ×${fx}`;
+  if(s.b==='restaurant') return `体力+${(2*f).toFixed(2)}/s(2人)`;
+  if(s.b==='game')  return `調子の回復ペース ×${fx}`;
+  if(s.b==='gym')   return `全員の体力+${(0.4*f).toFixed(2)}/s・調子低下を防ぐ`;
+  if(s.b==='onsen') return `体力+${(2.5*f).toFixed(2)}/s(3人)・調子もほぐす`;
+  if(s.b==='hall')  return `全員の調子UP・公演収入 +${(6*f).toFixed(1)}G/s`;
+  if(s.b==='miyage') return `図鑑×0.1G/s ×${fx}(現在 +${(0.1*discCount()*f).toFixed(1)}G/s)`;
+  if(s.b==='tank')  return `図鑑人気 +${(8*f).toFixed(1)}%(全体で×${tankMul().toFixed(2)})・生物が泳ぐ`;
+  if(s.b==='dock2') return `派遣コスト -${(10*f).toFixed(1)}%(全体で-${Math.round(dockDisc()*100)}%)`;
+  if(s.b==='train') return `特訓:経験値 +${fx}/s(最低Lvのクルー)`;
+  if(s.b==='ad')    return `観光収入 +${(4*f).toFixed(1)}%・フェリー増便`;
+  if(s.b==='garden') return `研究 +${fx}/s(故障の影響なし)`;
+  if(s.b==='subfac') return `潜航時間 -${(5*f).toFixed(1)}%(全体で-${Math.round((1-subSpeedMul())*100)}%)`;
+  if(s.b==='vault') return `オフライン効率 +${(10*f).toFixed(1)}%(現在 ${Math.round(vaultEff()*100)}%)`;
+  if(s.b==='gate')  return `レア発見率 +${(15*f).toFixed(1)}%`;
+  if(s.b==='plab')  return `全ラボの研究 ×${(1+0.1*f).toFixed(2)}`;
+  if(s.b==='spring') return `全員回復+調子ガード(人魚在籍で2倍)`;
+  if(s.b==='casino') return `毎秒5%で+${Math.round(40*f)}G・0.2%でJACKPOT ${fmt(1000*f)}G`;
+  return '';
+}
+function renderMod(){
+  const s=pickedSlot, b=BTYPES[s.b], body=$('modBody');
+  body.innerHTML='';
+  const info=document.createElement('div'); info.className='item';
+  const need=b.crew||0;
+  const onTx = need===0 ? '' :
+    (s.b==='cap'||s.b==='lab')
+      ? '' :
+    facOn(s) ? `<small style="color:#7fe7d4">✓ 稼働中(担当${need}人)${FACSTAT[s.b]?`／相性：${STATN[FACSTAT[s.b]]}(効果 ×${staffMul(s).toFixed(2)})`:''}</small>`
+             : `<small style="color:#ff9eba">✕ 無人で停止中…クルー${need}人が必要${FACSTAT[s.b]?`(相性：${STATN[FACSTAT[s.b]]})`:''}</small>`;
+  info.innerHTML=`<div class="tx"><b>${b.name} <span style="color:#ffd97a">Lv.${s.blv}</span></b><small>${b.desc}</small><small>現在の効果：${modEffectText(s)}</small>${onTx}</div>`;
+  body.appendChild(info);
+  if(s.blv < maxLvOf(s)){
+    const costP=Math.min(9, 1+Math.floor(s.blv/3)), costG=Math.round(BTYPES[s.b].cost*0.35*Math.pow(1.18, s.blv-1));
+    const up=document.createElement('div'); up.className='item';
+    const tx=document.createElement('div'); tx.className='tx';
+    tx.innerHTML=`<b>強化キットで Lv.${s.blv+1} へ</b><small>必要：強化パーツ×${costP} + ${costG}G</small><small>(パーツは潜水艇の探索で手に入る)</small>`;
+    const btn=document.createElement('button'); btn.className='buyBtn gold'; btn.textContent='強化!';
+    btn.disabled = S.parts<costP || S.g<costG || S.tut<99;
+    if(S.tut<99) btn.textContent='チュートリアル後に';
+    btn.onclick=()=>{
+      S.parts-=costP; S.g-=costG; s.blv++;
+      fxUpgrade(s);
+      if(s.b==='hab') S.crewCap += 2;
+      misAdd('w','up');
+      toast(`${b.name}が Lv.${s.blv} になった!`);
+      renderMod(); refreshHud();
+    };
+    up.append(tx,btn); body.appendChild(up);
+  } else {
+    const mx=document.createElement('div'); mx.className='item';
+    mx.innerHTML='<div class="tx"><b style="color:#ffd97a">✦ 最大レベル! ✦</b></div>';
+    body.appendChild(mx);
+  }
+  const del=document.createElement('div'); del.className='item';
+  const dtx=document.createElement('div'); dtx.className='tx';
+  dtx.innerHTML=`<b>撤去</b><small>払い戻し ${Math.floor(b.cost/2)}G</small>`;
+  const dbtn=document.createElement('button'); dbtn.className='byeBtn'; dbtn.textContent='撤去する';
+  if(S.tut<99){ dbtn.disabled=true; dbtn.textContent='チュートリアル中'; }
+  dbtn.onclick=()=>{
+    if(S.tut<99) return;
+    if(s.b==='hab'){
+      const lose = 2*s.blv;
+      if(S.crew.length > S.crewCap - lose){ toast('クルーが上限を超えるため撤去できない!', true); return; }
+      S.crewCap -= lose;
+    }
+    if(b.big){   // 大型施設は外側半分(__ext)も解放
+      const e=extOf(s);
+      if(e && e.b==='__ext'){ e.b=null; e.blv=1; }
+    }
+    S.g += Math.floor(b.cost/2);
+    s.b=null; s.blv=1; asgDirty=true;
+    toast('施設を撤去した');
+    closePanels(); refreshHud();
+  };
+  del.append(dtx,dbtn); body.appendChild(del);
+}
+
+// ---------- sub panel ----------
+const SUBCOST=[0, 2000, 8000, 20000];   // n隻目→n+1隻目の購入コスト
+function renderSub(){
+  const body=$('subBody'); body.innerHTML='';
+  const A=assignments();
+  // 操縦士ロースター(艇ごとに専属。施設の担当はしない)
+  const pInfo=document.createElement('div'); pInfo.className='item';
+  const rows = A.pilots.length
+    ? A.pilots.map((p,i)=>{
+        const exp=S.exps.find(e=>e.pid===p.id);
+        const st = exp ? `<span style="color:#9fdcff">🌊 ${ZONES[exp.zone].name}を潜航中</span>` : '<span style="color:#7fe7d4">⚓ スタンバイ</span>';
+        return `<small>${i+1}号艇：<b>${p.name}</b> ${starTx(p.star, STAR_COL[p.star-1])} 操縦${p.stats.pilot} ${st}</small>`;
+      }).join('')
+    : '<small>操縦士がいない…クルーをスカウトしよう</small>';
+  const lack = S.subs - A.pilots.length;
+  pInfo.innerHTML = `<div class="tx"><b>専属操縦士 ${A.pilots.length}/${S.subs}人</b>${rows}${lack>0?`<small style="color:#ff9eba">⚠ クルー不足で${lack}隻ぶんの操縦士が確保できない</small>`:''}<small style="color:#6fa3d0">※操縦士は施設の担当を兼任しない</small></div>`;
+  if(isNight()){
+    const nh=document.createElement('div'); nh.className='item';
+    nh.innerHTML='<div class="tx"><small style="color:#9fdcff">🌙 夜のあいだは発光生物が活発…レア発見率 +5%!</small></div>';
+    body.appendChild(nh);
+  }
+  body.appendChild(pInfo);
+  // 未踏深層(エンドレス深度)
+  if(S.zoneUnlocked>=4){
+    const ab=document.createElement('div'); ab.className='item';
+    const tx2=document.createElement('div'); tx2.className='tx';
+    const nextMile = abyssMile() - (S.abyss.d % abyssMile());
+    if(S.abyssExp){
+      const left=Math.max(0, Math.ceil((S.abyssExp.t0 + S.abyssExp.dur*1000 - Date.now())/1000));
+      const pl=S.crew.find(c=>c.id===S.abyssExp.pid);
+      tx2.innerHTML=`<b>🕳 未踏深層</b><small>${pl?pl.name+'が':''}降下中…(あと ${left}秒)</small><small>現在 ${fmt(S.abyss.d)}m／最高 ${fmt(S.abyss.best)}m</small>`;
+      const awb=document.createElement('button'); awb.className='buyBtn';
+      if(canFreeWarp()){ awb.textContent = S.tut<99 ? '⚡無料で帰還' : '⚡無料で帰還(本日1回)'; }
+      else { const wc=warpCostNow(left, 3, 4); awb.textContent=`⚡帰還 ${fmt(wc)}G${warpUses(4)>0?`(本日${warpUses(4)+1}回目)`:''}`; awb.disabled = S.g < wc; }
+      awb.onclick=()=> instantAbyssReturn();
+      ab.append(tx2, awb);
+    } else {
+      const fp2=freePilot();
+      tx2.innerHTML=`<b>🕳 未踏深層(エンドレス)</b><small>現在 ${fmt(S.abyss.d)}m／最高 ${fmt(S.abyss.best)}m</small>`+
+        `<small>つぎの節目まで ${fmt(nextMile)}m(${fmt(abyssMile())}mごとに💎ふか石)</small>`+
+        `<small>挑戦：${fmt(abyssCost())}G・${abyssTime()}秒／深いほど費用がかさむ…ねらいは💎!</small>`+
+        (S.gen>1?`<small style="color:#ffd97a">第${S.gen}世代ボーナス:掘削 +${(S.gen-1)*10}%</small>`:'');
+      const btn2=document.createElement('button'); btn2.className='buyBtn gold'; btn2.textContent='降下!';
+      const storm2 = S.event && S.event.type==='storm';
+      btn2.disabled = fleetBusy()>=S.subs || S.g<abyssCost() || storm2 || !fp2;
+      if(storm2) btn2.textContent='嵐で欠航';
+      else if(fleetBusy()>=S.subs) btn2.textContent='全艦出航中';
+      else if(!fp2) btn2.textContent='操縦士不足';
+      btn2.onclick=()=> startAbyss();
+      ab.append(tx2,btn2);
+    }
+    body.appendChild(ab);
+  }
+  // 艦隊
+  const fleet=document.createElement('div'); fleet.className='item';
+  const ftx=document.createElement('div'); ftx.className='tx';
+  ftx.innerHTML=`<b>艦隊：${'🟡'.repeat(S.subs)}${'⚫'.repeat(4-S.subs)} ${S.subs}/4隻</b><small>出航中 ${fleetBusy()}隻／待機 ${S.subs-fleetBusy()}隻</small>`;
+  fleet.appendChild(ftx);
+  if(S.subs<4){
+    const cost=SUBCOST[S.subs];
+    const btn=document.createElement('button'); btn.className='buyBtn gold';
+    btn.textContent=`増艦 ${fmt(cost)}G`;
+    if(S.tut<99){ btn.disabled=true; btn.textContent='チュートリアル後に'; }
+    btn.disabled = S.g<cost;
+    btn.onclick=()=>{
+      S.g-=cost; S.subs++; asgDirty=true;   // 操縦士をすぐ確保し直す
+      toast(`新しい潜水艇が配備された! (${S.subs}/4隻)`);
+      blip([523,659,784],'triangle');
+      renderSub(); refreshHud();
+    };
+    fleet.appendChild(btn);
+  } else {
+    const mx=document.createElement('div'); mx.style.cssText='color:#ffd97a;font-size:12px;flex:none;'; mx.textContent='最大!';
+    fleet.appendChild(mx);
+  }
+  body.appendChild(fleet);
+  // アイテム倉庫
+  Object.keys(ITEMS).filter(id=>S.items[id]>0).forEach(id=>{
+    const it=ITEMS[id];
+    const div=document.createElement('div'); div.className='item';
+    const tx=document.createElement('div'); tx.className='tx';
+    const active = buffOn(it.buff) ? `<span style="color:#7fe7d4">発動中 あと${Math.ceil((S.buffs[it.buff]-Date.now())/1000)}秒</span>` : '';
+    tx.innerHTML=`<b>${it.icon} ${it.name} ×${S.items[id]}</b><small>${it.desc} ${active}</small>`;
+    const btn=document.createElement('button'); btn.className='buyBtn'; btn.textContent='使う';
+    btn.onclick=()=>{ useItem(id); renderSub(); };
+    div.append(tx,btn);
+    body.appendChild(div);
+  });
+  const expDur = (z,p) => Math.ceil(
+    Math.max(z.expTime*0.5, z.expTime*(1-(p?p.stats.pilot:0)*0.03)) * (buffOn('speed')?0.6:1) * subSpeedMul() * relicExpTime() * (wkIs('nagi')?0.75:1)
+  );
+  const fmtT = s => s>=60 ? `${Math.floor(s/60)}分${s%60}秒` : `${s}秒`;
+  S.exps.forEach((e,ei)=>{
+    const left = Math.max(0, Math.ceil((e.t0 + e.dur*1000 - Date.now())/1000));
+    const pl = S.crew.find(c=>c.id===e.pid);
+    const d=document.createElement('div'); d.className='item';
+    const tx=document.createElement('div'); tx.className='tx';
+    tx.innerHTML=`<b>探索中…</b><small>${pl?pl.name+'が':''}${ZONES[e.zone].name}を調査している(あと ${fmtT(left)})</small>`;
+    const wb=document.createElement('button'); wb.className='buyBtn';
+    if(canFreeWarp()){ wb.textContent = S.tut<99 ? '⚡無料で帰還' : '⚡無料で帰還(本日1回)'; }
+    else { const wc=warpCostNow(left, e.zone, e.zone); wb.textContent=`⚡帰還 ${fmt(wc)}G${warpUses(e.zone)>0?`(本日${warpUses(e.zone)+1}回目)`:''}`; wb.disabled = S.g < wc; }
+    wb.onclick=()=> instantReturn(ei);
+    d.append(tx, wb);
+    body.appendChild(d);
+  });
+  ZONES.forEach((z,i)=>{
+    const div=document.createElement('div'); div.className='item';
+    const tx=document.createElement('div'); tx.className='tx';
+    const found = CREATURES.filter(c=>c.z===i && !c.hidden && S.dex[c.id]).length;
+    const total = CREATURES.filter(c=>c.z===i && !c.hidden).length;
+    if(i < S.zoneUnlocked){
+      const fp = freePilot();
+      tx.innerHTML=`<b>${z.name}</b><small>${z.sub}／発見 ${found}/${total}種</small><small>派遣：${expCostOf(z)}G・${expDur(z,fp)}秒${fp?`／操縦：${fp.name}`:''}</small>`;
+      const btn=document.createElement('button'); btn.className='buyBtn'; btn.textContent='出航!';
+      const storm = S.event && S.event.type==='storm';
+      btn.disabled = fleetBusy()>=S.subs || S.g<expCostOf(z) || storm || !fp;
+      if(storm) btn.textContent='嵐で欠航';
+      else if(fleetBusy()>=S.subs) btn.textContent='全艦出航中';
+      else if(!fp) btn.textContent='操縦士不足';
+      btn.onclick=()=>{
+        const p=freePilot(); if(!p || fleetBusy()>=S.subs || S.g<expCostOf(z)) return;
+        S.g-=expCostOf(z); S.exps.push({zone:i, t0:Date.now(), dur:expDur(z,p), pid:p.id});
+        toast(`${p.name}が潜水艇で${z.name}へ出航した!`); renderSub(); refreshHud();
+      };
+      div.append(tx,btn);
+    } else if(i === S.zoneUnlocked){
+      tx.innerHTML=`<b>${z.name} 🔒</b><small>${z.sub}</small><small>解放：研究${z.unlockR}pt + ${z.unlockG}G</small>`;
+      const btn=document.createElement('button'); btn.className='buyBtn gold'; btn.textContent='解放する';
+      if(S.tut<99){ btn.disabled=true; btn.textContent='チュートリアル後に'; }
+      btn.disabled = S.r<z.unlockR || S.g<z.unlockG;
+      btn.onclick=()=>{
+        S.r-=z.unlockR; S.g-=z.unlockG; S.zoneUnlocked++;
+        toast(`${z.name} を解放した! シャフトが伸びた!`);
+        renderSub(); refreshHud();
+      };
+      div.append(tx,btn);
+    } else {
+      tx.innerHTML=`<b style="color:#3f5c7e">${z.name} 🔒</b><small>さらに深い海域…</small>`;
+      div.append(tx);
+    }
+    body.appendChild(div);
+  });
+}
+
+// ---------- expedition resolve ----------
+function resolveExp(idx){
+  const e = S.exps.splice(idx,1)[0];
+  const z = e.zone;
+  const pool = CREATURES.filter(c=>c.z===z && !c.hidden && !c.boss);
+  // ヌシの影!?(未捕獲の海域のみ)
+  if(Math.random() < nushiChance(z)){
+    setTimeout(()=> startNushi(z), 400);
+  }
+  const pilot = S.crew.find(c=>c.id===e.pid) || assignments().pilot;   // 出航時の専属操縦士
+  let boost = (1 + lightPow() + gatePow() + relicLuck() + (pilot ? pilot.stats.pilot*0.02 : 0)) * (isNight()?1.05:1);
+  if(buffOn('luck2')) boost *= 2;
+  if(S.lucky){ boost *= 3; S.lucky=false; toast('🍀 幸運の効果が発動中!'); }
+  let pick;
+  if(z===3 && !S.dex.mermaid && Math.random() < 0.02*boost){
+    pick = CREATURES.find(c=>c.id==='mermaid');           // 伝説の人魚!!
+  } else {
+    const W={1:56, 2:26, 3:12, 4:4.5, 5:1.5};
+    const weights = pool.map(c=> c.rare<=2 ? W[c.rare] : W[c.rare]*boost*(c.rare>=4?1.2:1));
+    let r = Math.random()*weights.reduce((a,b)=>a+b,0); pick=pool[0];
+    for(let i=0;i<pool.length;i++){ r-=weights[i]; if(r<=0){ pick=pool[i]; break; } }
+  }
+  const isNew = !S.dex[pick.id];
+  S.dex[pick.id] = (S.dex[pick.id]||0)+1;
+  questHit(pick);
+  misAdd('d','exp'); misAdd('w','exp'); S.life.exp++; wkcCount('exp');
+  if(isNew) misAdd('w','nw');
+  if(pilot){ gainXp(pilot, 8); if(!pilot.mermaid) pilot.hp=Math.max(0, pilot.hp-8); }
+  if(Math.random() < ITEM_DROP_RATE) setTimeout(()=> rollDrop(z), 600);
+  if(isNew) blip([523,659,784,1047],'triangle');
+  if(isNew){
+    const reward = pick.bounty || (pick.hidden ? 2000 : [0,80,180,360,700,1500][pick.rare]);
+    S.g += reward;
+    showDiscover(pick, reward, true);
+    if(pick.id==='mermaid'){
+      const mc=makeMermaidCrew();
+      S.crew.push(mc); S.crewCap++; asgDirty=true;   // 枠+1で特別加入
+      setTimeout(()=>{ toast('✦✦ 人魚マーメがクルーに加わった!! ✦✦'); blip([659,784,1047,1319,1568],'triangle'); }, 1500);
+    }
+  } else {
+    const reward = pick.rare*40;
+    S.g += reward;
+    toast(`${pick.name}を${pick.kind==='obj'?'また回収した':'再観測'} (+${reward}G)`);
+  }
+  refreshHud();
+}
+const RARC=['#9fb6c4','#7fe7d4','#6ea8ff','#c77ddb','#ffd97a'];   // レア度カラー(★1〜5)
+// 色覚サポート:★は常に色+数字の二重表現で示す
+const starTx = (n, col) => `<span style="color:${col||RARC[n-1]}">${'★'.repeat(n)}</span><span class="rnum">${n}</span>`;
+function applyFont(){ document.body.classList.toggle('bigfont', !!S.bigFont); }
+function discFx(rare, isNew){
+  const box=$('discBox');
+  box.querySelectorAll('.fxEl').forEach(el=>el.remove());
+  document.querySelectorAll('.flashFx').forEach(el=>el.remove());
+  $('discTitle').className=''; box.className='';
+  if(!isNew) return;
+  // ★2+:キラキラ
+  if(rare>=2){
+    const n=3+rare*3;
+    for(let i=0;i<n;i++){
+      const sp=document.createElement('div'); sp.className='sparkP fxEl';
+      sp.textContent=['✦','✧','✨','・'][i%4];
+      sp.style.color = i%3===0 ? RARC[rare-1] : '#fff';
+      sp.style.left=(8+Math.random()*84)+'%';
+      sp.style.top=(20+Math.random()*55)+'%';
+      sp.style.animationDelay=(Math.random()*1.4)+'s';
+      sp.style.animationIterationCount='infinite';
+      box.appendChild(sp);
+    }
+  }
+  // ★3+:回転光線(★3=金、★4=紫、★5=虹)
+  if(rare>=3){
+    const ray=document.createElement('div'); ray.className='discRays fxEl'+(rare>=5?' rainbow':'');
+    ray.style.setProperty('--rayc', rare===3?'rgba(255,217,122,.30)': rare===4?'rgba(199,125,219,.34)':'rgba(255,200,80,.40)');
+    box.insertBefore(ray, box.firstChild);
+  }
+  // ★4+:紙吹雪
+  if(rare>=4){
+    const n = rare===4 ? 16 : 34;
+    const cols=['#ffd97a','#7fe7d4','#ff9eba','#9fdcff','#c77ddb','#bdffd9'];
+    for(let i=0;i<n;i++){
+      const p=document.createElement('div'); p.className='confettiP fxEl';
+      p.style.left=(2+Math.random()*96)+'%';
+      p.style.background=cols[i%cols.length];
+      p.style.animationDuration=(1.2+Math.random()*1.6)+'s';
+      p.style.animationDelay=(Math.random()*1.2)+'s';
+      p.style.animationIterationCount='infinite';
+      box.appendChild(p);
+    }
+    $('discTitle').className = rare===4 ? 'r4title' : '';
+  }
+  // ★5:画面フラッシュ+タイトル鼓動+箱がふるえる+ファンファーレ
+  if(rare>=5){
+    const fl=document.createElement('div'); fl.className='flashFx';
+    document.body.appendChild(fl); setTimeout(()=>fl.remove(), 700);
+    $('discTitle').className='r5title';
+    box.className='r5box';
+    blip([392,523,659,784,1047,1319,1568],'triangle',.3);
+  } else if(rare===4){ blip([523,659,784,1047],'triangle',.22); }
+  else if(rare===3){ blip([523,659,784],'triangle',.18); }
+}
+function showDiscover(c, reward, isNew){
+  const rare = c.hidden ? 5 : c.rare;
+  $('discTitle').textContent =
+    (c.hidden && isNew) ? '✦✦ 人魚伝説は本当だった!! ✦✦'
+    : c.kind==='obj' ? (isNew ? (c.rare>=4?'⚓✦ 大物サルベージ!! ✦⚓':'⚓ サルベージ成功!! ⚓') : '回収成功')
+    : isNew ? (c.rare>=5 ? '✦✦✦ 超激レア発見!!! ✦✦✦' : c.rare>=4 ? '✦✦ 激レア発見!! ✦✦' : '✦ 新種発見!! ✦') : '観測成功';
+  $('discName').textContent = c.name;
+  const rc = RARC[(c.hidden?5:c.rare)-1];
+  $('discRar').innerHTML = starTx(c.rare, rc) + (reward>0 ? `　(+${fmt(reward)}G)` : '');
+  $('discName').style.textShadow = (c.hidden||c.rare>=4) ? `0 0 8px ${rc}` : 'none';
+  $('discDesc').textContent = c.desc;
+  const dc=$('discCv'), o=dc.getContext('2d');
+  o.clearRect(0,0,dc.width,dc.height); o.imageSmoothingEnabled=false;
+  const s=SPR[c.id];
+  o.drawImage(s, (dc.width-s.width)>>1, (dc.height-s.height)>>1);
+  discFx(rare, isNew);
+  $('discover').classList.add('open');
+}
+$('discOk').onclick=()=> $('discover').classList.remove('open');
+
+// ---------- dex ----------
+function renderDex(){
+  const grid=$('dexGrid'); grid.innerHTML='';
+  CREATURES.forEach(c=>{
+    const card=document.createElement('div');
+    const got=!!S.dex[c.id];
+    card.className='dexCard'+(got?'':' locked');
+    const oc=document.createElement('canvas'); oc.width=18; oc.height=12;
+    const o=oc.getContext('2d'); o.imageSmoothingEnabled=false;
+    const s= got? SPR[c.id] : silhouette(c);
+    o.drawImage(s,(18-s.width)>>1,(12-s.height)>>1);
+    const nm=document.createElement('div'); nm.className='nm';
+    nm.textContent= got ? c.name : (c.hidden ? '伝説の存在…?' : '？？？');
+    const rar=document.createElement('div'); rar.className='rar';
+    rar.innerHTML= got
+      ? `${starTx(c.rare, RARC[(c.hidden?5:c.rare)-1])} ×${S.dex[c.id]}<br><span style="color:#7fe7d4">人気+${popOf(c)}/s</span>`
+      : (c.hidden ? '<span style="color:#c77ddb">超深海のうわさ…✦</span>'
+                  : c.boss ? `<span style="color:#ffd97a">${ZONES[c.z].name}のヌシの気配…</span>`
+                  : ZONES[c.z].name + (c.kind==='obj' ? '・ひろいもの' : ''));
+    card.append(oc,nm,rar);
+    if(got) card.onclick=()=> showDiscover(c, 0, false);
+    grid.appendChild(card);
+  });
+}
+
+// ---------- crew panel & gacha ----------
+function statRow(c){
+  return ['tour','res','pilot','humor'].map(k=>
+    `${STATN[k]}<span class="bar"><i style="width:${c.stats[k]*10}%"></i></span>${c.stats[k]}`
+  ).join('　');
+}
+const CONDF=['😫','🙁','😐','🙂','😄'];
+function jobOf(c){
+  if(c.sick){
+    const treated = S.slots.some(s=>s.b==='med') && S.crew.filter(x=>x.sick).indexOf(c) < S.slots.filter(s=>s.b==='med').length;
+    return treated ? '🛏 医務室で治療中…' : '😷 病気!(医務室が必要)';
+  }
+  const A=assignments();
+  const pi=A.pilots.indexOf(c);
+  if(pi>=0){
+    const atSea = S.exps.some(e=>e.pid===c.id);
+    return `${pi+1}号艇の専属操縦士${atSea?'(潜航中!)':'(スタンバイ)'}`;
+  }
+  let j = A.caps.includes(c) ? '観光カプセル担当'
+        : A.labs.includes(c) ? '研究ラボ担当' : '';
+  if(!j){
+    for(const s of S.slots){
+      const st=A.staff[slotId(s)];
+      if(st && st.includes(c)){ j=BTYPES[s.b].name+'担当'; break; }
+    }
+  }
+  return j || '待機中';
+}
+function hpBar(c){
+  const col = c.hp>60 ? '#3fa37a' : c.hp>30 ? '#d9a93d' : '#cf4f3e';
+  return `体力<span class="bar"><i style="width:${Math.round(c.hp)}%;background:${col}"></i></span>${Math.round(c.hp)}　調子${CONDF[c.cond-1]}`;
+}
+function renderCrew(){
+  const free = S.crewCap - S.crew.length;
+  $('gachaBtn').disabled = S.g < GACHA_COST || free < 1 || !tutGacha();
+  $('gachaBtn').classList.remove('tutGlow');
+  if(S.tut<99 && tutGacha() && !$('gachaBtn').disabled) $('gachaBtn').classList.add('tutGlow');
+  $('gachaBtn').textContent = free < 1 ? '上限いっぱい' : `1回 ${GACHA_COST}G`;
+  $('gachaTkBtn').disabled = S.tickets < 1 || free < 1 || S.tut<99;
+  $('gacha10Btn').disabled = S.g < GACHA_COST*5 || free < 1 || S.tut<99;
+  $('tkTx').textContent = `🎫 ガチャチケット：${S.tickets}枚`;
+  $('pickupTx').textContent = `本日のピックアップ：${STATN[pickupMain()]}タイプ(60%)`;
+  const list=$('crewList'); list.innerHTML='';
+  [...S.crew].sort((a,b)=>b.star-a.star).forEach(c=>{
+    const card=document.createElement('div'); card.className='crewCard';
+    card.style.borderColor = STAR_COL[c.star-1];
+    const oc=document.createElement('canvas'); oc.width=10; oc.height=12;
+    const o=oc.getContext('2d'); o.imageSmoothingEnabled=false; o.drawImage(c.spr,0,0);
+    const tx=document.createElement('div'); tx.className='ct';
+    tx.innerHTML=`<b>${c.name}</b> ${starTx(c.star, STAR_COL[c.star-1])}
+      <span style="color:#6fa3d0;font-size:11px;">Lv.${c.clv}</span>
+      <span style="color:#ffd97a;font-size:11px;">「${c.skill}」</span>${c.sick?' <span style="color:#ff9eba">😷</span>':''}<br>
+      ${statRow(c)}<br>${hpBar(c)}<br><span class="job">▶ ${jobOf(c)}</span>`;
+    const bye=document.createElement('button'); bye.className='byeBtn'; bye.textContent='送別\n+50G';
+    if(c.mermaid){ bye.disabled=true; bye.textContent='永久\n在籍'; }
+    bye.onclick=()=>{
+      if(c.mermaid) return;
+      S.crew = S.crew.filter(x=>x.id!==c.id);
+      S.g += 50; asgDirty=true;
+      toast(`${c.name}が島へ帰っていった… (+50G)`);
+      renderCrew(); refreshHud();
+    };
+    card.append(oc,tx,bye); list.appendChild(card);
+  });
+  if(!S.crew.length){
+    list.innerHTML='<div style="font-size:12px;color:#6fa3d0;text-align:center;padding:10px;">クルーがいない!ガチャでスカウトしよう</div>';
+  }
+}
+// ---------- gacha animation ----------
+const gcv = $('gachaAnimC'), gctx = gcv.getContext('2d');
+let gAnim = null;
+const rarCol = star => star<=2 ? '#bfe6f7' : star===3 ? '#6ea8ff' : star===4 ? '#c77ddb' : '#ffd97a';
+function drawChest(o, x, y, open){
+  if(open){ o.fillStyle='#8a5a2e'; o.fillRect(x-8,y-10,16,3); o.fillStyle='#fff8d8'; o.fillRect(x-6,y-7,12,2); }
+  o.fillStyle='#5e3c1c'; o.fillRect(x-9,y-6,18,12);
+  o.fillStyle='#8a5a2e'; o.fillRect(x-8,y-5,16,10);
+  o.fillStyle='#ffd97a'; o.fillRect(x-9,y-1,18,2);
+  o.fillStyle='#b08a2e'; o.fillRect(x-2,y-2,4,4);
+}
+function startGachaAnim(c, onDone){
+  $('gachaCard').style.display='none';
+  $('gachaCard').classList.remove('legend');
+  gcv.style.display='block';
+  gAnim = {c, t:0, parts:[], onDone};
+  $('gachaModal').classList.add('open');
+  requestAnimationFrame(stepGacha);
+}
+gcv.onclick = ()=>{ if(gAnim && gAnim.t<168) gAnim.t=168; };
+function stepGacha(){
+  if(!gAnim) return;
+  const a=gAnim, o=gctx, W=140, H=120, star=a.c.star;
+  a.t++;
+  o.imageSmoothingEnabled=false;
+  o.fillStyle='#04101d'; o.fillRect(0,0,W,H);
+  // 背景の泡
+  o.fillStyle='rgba(140,200,240,.25)';
+  for(let i=0;i<9;i++){
+    o.fillRect((i*53 + i*i*7)%W, H - ((a.t*0.7 + i*41)%H), 2,2);
+  }
+  const cx2=W/2, cy2=H/2+8;
+  if(a.t < 50){                       // 宝箱が沈んでくる
+    const p=a.t/50;
+    drawChest(o, cx2 + Math.round(Math.sin(a.t*.2)*4), Math.min(-14 + p*p*(cy2+14), cy2), false);
+  } else if(a.t < 170){               // 震えながらレア度の色に光る
+    const k=(a.t-50)/120, col=rarCol(star);
+    const glow=o.createRadialGradient(cx2,cy2,2, cx2,cy2, 22+55*k);
+    glow.addColorStop(0,col); glow.addColorStop(1,'rgba(0,0,0,0)');
+    o.globalAlpha=.22+.5*k + .08*Math.sin(a.t*.5);
+    o.fillStyle=glow; o.fillRect(0,0,W,H);
+    o.globalAlpha=1;
+    if(star>=4){                      // ★4以上は回転する光線
+      o.save(); o.translate(cx2,cy2); o.rotate(a.t*.05);
+      o.fillStyle = star===5 ? 'rgba(255,217,122,.22)' : 'rgba(199,125,219,.2)';
+      for(let i=0;i<6;i++){ o.rotate(Math.PI/3); o.fillRect(0,-3,72,6); }
+      o.restore();
+    }
+    drawChest(o, cx2 + Math.round(Math.sin(a.t*(0.35+k*0.7))*(1+4*k)), cy2, false);
+  } else if(a.t < 202){               // 開封バースト
+    if(a.parts.length===0){
+      blip([392,523,659,784,1047]);
+      for(let i=0;i<28;i++){
+        const an=Math.random()*6.28, sp=1+Math.random()*2.6;
+        a.parts.push({x:cx2, y:cy2-4, vx:Math.cos(an)*sp, vy:Math.sin(an)*sp});
+      }
+    }
+    o.fillStyle='rgba(255,255,255,'+Math.max(0,(192-a.t)/22)+')'; o.fillRect(0,0,W,H);
+    drawChest(o, cx2, cy2, true);
+    o.fillStyle=rarCol(star);
+    for(const p of a.parts){ p.x+=p.vx; p.y+=p.vy; p.vy+=.02; o.fillRect(p.x,p.y,2,2); }
+  } else { finishGacha(); return; }
+  o.fillStyle='rgba(140,180,210,.7)'; o.font='9px monospace';
+  o.fillText('タップでスキップ', 36, H-5);
+  requestAnimationFrame(stepGacha);
+}
+function finishGacha(){
+  const c=gAnim.c, cb=gAnim.onDone; gAnim=null;
+  gcv.style.display='none';
+  if(cb) cb(); else revealGacha(c);
+}
+function revealGacha(c){
+  $('gachaName').textContent = c.name;
+  const gs=$('gachaStars'); gs.innerHTML='';
+  for(let i=0;i<5;i++){
+    const sp=document.createElement('span');
+    sp.textContent = i<c.star ? '★' : '☆';
+    sp.style.animationDelay = (0.15 + i*0.22)+'s';
+    gs.appendChild(sp);
+  }
+  gs.style.color=STAR_COL[c.star-1];
+  $('gachaSkill').textContent='スキル「'+c.skill+'」' + (c.skillD ? '：'+c.skillD : '');
+  $('gachaStats').innerHTML=statRow(c).split('　').join('<br>');
+  const dc=$('gachaCv'), o=dc.getContext('2d');
+  o.imageSmoothingEnabled=false; o.clearRect(0,0,10,12); o.drawImage(c.spr,0,0);
+  if(c.star===5) $('gachaCard').classList.add('legend');
+  $('gachaCard').style.display='block';
+}
+$('gachaOk').onclick=()=> $('gachaModal').classList.remove('open');
+$('gachaBtn').onclick=()=>{
+  if(gAnim) return;   // 演出中は受け付けない
+  if(S.crew.length>=S.crewCap){ toast('クルーがいっぱい!居住区を建てよう', true); return; }
+  if(S.g<GACHA_COST) return;
+  S.g -= GACHA_COST;
+  const c = genCrew(gachaRoll());
+  S.crew.push(c); asgDirty=true;
+  misAdd('d','gacha'); misAdd('w','gacha'); S.life.gacha++;
+  startGachaAnim(c); renderCrew(); refreshHud();
+};
+$('gachaTkBtn').onclick=()=>{
+  if(gAnim) return;
+  if(S.crew.length>=S.crewCap){ toast('クルーがいっぱい!居住区を建てよう', true); return; }
+  if(S.tickets<1) return;
+  S.tickets--;
+  const c = genCrew(gachaRoll());
+  S.crew.push(c); asgDirty=true;
+  misAdd('d','gacha'); misAdd('w','gacha'); S.life.gacha++;
+  startGachaAnim(c); renderCrew(); refreshHud();
+};
+$('gacha10Btn').onclick=()=>{
+  if(gAnim) return;
+  const free = S.crewCap - S.crew.length;
+  if(free<1){ toast('クルーがいっぱい!居住区を建てよう', true); return; }
+  if(S.g<GACHA_COST*5) return;
+  S.g -= GACHA_COST*5;   // 5連:単発×5(割引・確定枠なし)
+  const stars = Array.from({length:5}, gachaRoll);
+  const pulls = stars.map(genCrew).sort((a,b)=>b.star-a.star);
+  const kept = pulls.slice(0, free), sold = pulls.slice(free);
+  S.crew.push(...kept);
+  S.g += sold.length*50;
+  asgDirty=true;
+  misAdd('d','gacha',5); misAdd('w','gacha',5); S.life.gacha+=5;
+  const best = pulls[0];
+  startGachaAnim(best, ()=>{
+    $('gachaModal').classList.remove('open');
+    showMulti(pulls, new Set(kept.map(c=>c.id)), sold.length);
+  });
+  renderCrew(); refreshHud();
+};
+function showMulti(pulls, keptSet, soldN){
+  const grid=$('multiGrid'); grid.innerHTML='';
+  pulls.forEach(c=>{
+    const card=document.createElement('div'); card.className='mCard'+(keptSet.has(c.id)?'':' sold');
+    if(keptSet.has(c.id)) card.style.borderColor=STAR_COL[c.star-1];
+    const oc=document.createElement('canvas'); oc.width=10; oc.height=12;
+    const o=oc.getContext('2d'); o.imageSmoothingEnabled=false; o.drawImage(c.spr,0,0);
+    const nm=document.createElement('div'); nm.textContent=c.name;
+    const st=document.createElement('div'); st.textContent='★'.repeat(c.star); st.style.color=STAR_COL[c.star-1];
+    card.append(oc,nm,st);
+    if(!keptSet.has(c.id)){ const s=document.createElement('div'); s.textContent='送別'; s.style.color='#ff9eba'; card.appendChild(s); }
+    grid.appendChild(card);
+  });
+  $('multiNote').textContent = soldN>0 ? `枠に入らなかった${soldN}人は送別 (+${soldN*50}G)` : '全員加入した!';
+  $('multiModal').classList.add('open');
+}
+$('multiOk').onclick=()=>{ $('multiModal').classList.remove('open'); renderCrew(); };
+$('btnCrew').onclick=()=>{ renderCrew(); openPanel('crewPanel'); };
+
+// ---------- sound ----------
+const audio = {on:false, ctx:null, master:null, vol:70};   // vol:0-100
+const applyVol = () => { if(audio.master) audio.master.gain.value = audio.on ? .13*(audio.vol/100)/0.7 : 0; };
+function ensureAudio(){
+  if(audio.ctx) return;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if(!AC) return;
+  audio.ctx = new AC();
+  audio.master = audio.ctx.createGain();
+  audio.master.gain.value = 0;
+  audio.master.connect(audio.ctx.destination);
+  [[55,.45],[82.41,.22],[110,.15]].forEach(([f,v])=>{           // 深海ドローン
+    const o=audio.ctx.createOscillator(); o.type='sine'; o.frequency.value=f;
+    const g=audio.ctx.createGain(); g.gain.value=v;
+    o.connect(g); g.connect(audio.master); o.start();
+  });
+  // 海域別スケール:陽光帯=明るいペンタ → 超深海=暗いマイナー、深いほど低音
+  const SCALES=[
+    [261.6,293.7,329.6,392,440,523.3,587.3],     // 陽光帯:メジャー
+    [261.6,293.7,311.1,392,415.3,523.3],         // 薄明帯:ドリアン風
+    [220,246.9,261.6,329.6,349.2,440],           // 深海帯:マイナー
+    [174.6,196,207.7,261.6,277.2,349.2],         // 超深海帯:フリジア風
+  ];
+  const camZone=()=>{ for(let z=ZONES.length-1; z>0; z--){ if(camY+VH/2 > rowY(z,0)-12) return z; } return 0; };
+  setInterval(()=>{
+    if(!audio.on || Math.random()>=.8) return;
+    const z=Math.min(camZone(), SCALES.length-1);
+    const sc=SCALES[z];
+    playPad(sc[Math.floor(Math.random()*sc.length)] * Math.pow(0.92, z));
+  }, 2100);
+}
+function playPad(f){
+  const ac=audio.ctx; if(!ac) return;
+  const o=ac.createOscillator(); o.type='triangle'; o.frequency.value=f;
+  const g=ac.createGain(); const t0=ac.currentTime;
+  g.gain.setValueAtTime(0,t0);
+  g.gain.linearRampToValueAtTime(.15,t0+.4);
+  g.gain.exponentialRampToValueAtTime(.001,t0+2.6);
+  o.connect(g); g.connect(audio.master); o.start(); o.stop(t0+2.7);
+}
+function blip(seq, type='square', vol=.18){
+  if(!audio.on || !audio.ctx) return;
+  const ac=audio.ctx, t0=ac.currentTime;
+  seq.forEach((f,i)=>{
+    const o=ac.createOscillator(); o.type=type; o.frequency.value=f;
+    const g=ac.createGain();
+    g.gain.setValueAtTime(vol, t0+i*.09);
+    g.gain.exponentialRampToValueAtTime(.001, t0+i*.09+.16);
+    o.connect(g); g.connect(audio.master);
+    o.start(t0+i*.09); o.stop(t0+i*.09+.2);
+  });
+}
+function setSound(on){
+  audio.on=on;
+  if(on){ ensureAudio(); if(audio.ctx&&audio.ctx.resume) audio.ctx.resume(); }
+  applyVol();
+  $('sndBtn').textContent='サウンド：'+(on?'ON':'OFF');
+}
+$('sndBtn').onclick=()=> setSound(!audio.on);
+$('volSlider').oninput=e=>{
+  audio.vol = +e.target.value;
+  $('volVal').textContent = audio.vol+'%';
+  applyVol();
+  if(audio.on) blip([523],'triangle',.15);   // 試し聞き
+};
+$('fontBtn').onclick=()=>{
+  S.bigFont=!S.bigFont; applyFont();
+  $('fontBtn').textContent='文字サイズ：'+(S.bigFont?'大きめ':'標準');
+  persist();
+};
+
+// ---------- crew XP ----------
+function gainXp(c, n){
+  if(c.clv>=10) return;
+  c.xp += n;
+  while(c.clv<10 && c.xp >= c.clv*150){
+    c.xp -= c.clv*150; c.clv++;
+    const st=c.stats;
+    let upK=c.main;
+    if(st[c.main]<10) st[c.main]++;
+    else {
+      const ks=['tour','res','pilot'].filter(k=>st[k]<10);
+      if(ks.length){ st[ks[0]]++; upK=ks[0]; } else { S.g+=100; upK=null; }
+    }
+    const KN={tour:'観光', res:'研究', pilot:'操縦', humor:'ユーモア'};
+    levelUpCutin(c, upK ? KN[upK] : 'ボーナス100G');
+    asgDirty=true;
+    toast(`${c.name}が Lv.${c.clv} になった!(${STATN[c.main]}UP)`);
+    blip([659,880],'triangle');
+  }
+}
+
+// ---------- skill cut-in ----------
+let cutQ=[], cutBusy=false;
+function triggerSkill(c){
+  misAdd('d','skill');
+  const fxType = c.skillFx || c.main;
+  let fx='';
+  if(fxType==='tour'){ const v=Math.round(40*c.star + c.stats.tour*8); S.g+=v; fx=`観光客が大よろこび! +${v}G`; }
+  else if(fxType==='res'){ const v=Math.round(18*c.star + c.stats.res*4); S.r+=v; fx=`ひらめいた! 研究pt +${v}`; }
+  else if(fxType==='pilot'){
+    if(S.exps.length){ S.exps.forEach(e=> e.t0 -= e.dur*300); fx='全艦急加速! 潜航が30%はやまった'; }
+    else { S.parts++; fx='整備中にパーツ発見! +1'; }
+  }
+  else if(fxType==='parts'){ S.parts+=2; fx='海底でおたから発見! パーツ+2'; }
+  else if(fxType==='lucky'){ S.lucky=true; fx='つぎの探索でレア率が大幅UP!'; }
+  else if(fxType==='tough'){
+    c.hp=Math.min(100, c.hp+40); fx='まだまだ働けるぞ! 体力+40';
+  }
+  else if(fxType==='immune'){
+    const sick=S.crew.find(x=>x.sick);
+    if(sick){ sick.sick=false; sick.sickT=0; sick.cond=3; asgDirty=true; fx=`特製ドリンクで${sick.name}の病気が治った!`; }
+    else { c.hp=Math.min(100, c.hp+20); fx='健康第一! 体力+20'; }
+  }
+  else if(fxType==='positive'){
+    c.cond=5; fx='ごきげんMAX! 調子😄に';
+  }
+  else if(fxType==='healall'){
+    const v=10+3*c.star;
+    S.crew.forEach(x=>{ if(!x.sick) x.hp=Math.min(100, x.hp+v); });
+    fx=`癒しのうたで全員の体力+${v}♪`;
+  }
+  else if(fxType==='cheer'){
+    S.crew.forEach(x=>{ if(!x.sick) x.cond=Math.min(5, x.cond+1); });
+    fx='みんなの調子が上がった!';
+  }
+  else if(fxType==='medic'){
+    const tgt=[...S.crew].filter(x=>!x.sick && x.id!==c.id).sort((a,b)=>a.hp-b.hp)[0] || c;
+    tgt.hp=Math.min(100, tgt.hp+50);
+    fx=`${tgt.name}を介抱した! 体力+50`;
+  }
+  else if(fxType==='mermaid'){
+    const v=100*c.star + c.stats.tour*15, rv=60;
+    S.g+=v; S.r+=rv; S.lucky=true;
+    fx=`海の祝福…! +${v}G +研究${rv}pt +幸運`;
+  }
+  if(cutQ.length<=2){ cutQ.push({c,fx}); pumpCut(); }   // 混雑時は演出のみ省略(効果は適用済み)
+}
+// レベルアップのカットイン(スキル演出を流用)
+function levelUpCutin(c, statName){
+  if(cutQ.length<=2){ cutQ.push({c, fx:`${statName} +1!`, title:`LEVEL UP!! Lv.${c.clv}`}); pumpCut(); }
+}
+function pumpCut(){
+  if(cutBusy || !cutQ.length) return;
+  cutBusy=true;
+  const {c,fx,title}=cutQ.shift();
+  const cutQ_title = title;
+  const o=$('cutCv').getContext('2d');
+  o.imageSmoothingEnabled=false; o.clearRect(0,0,10,12); o.drawImage(c.spr,0,0);
+  $('cutName').innerHTML=`${c.name} <span style="color:${STAR_COL[c.star-1]}">${'★'.repeat(c.star)}</span>`;
+  $('cutSkill').textContent = cutQ_title || `「${c.skill}」発動!!`;
+  $('cutFx').textContent=fx;
+  const el=$('cutin');
+  el.style.setProperty('--cc', STAR_COL[c.star-1]);
+  el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  blip(title ? [659,880,1319] : [880,1175], title?'triangle':'square', .14);
+  setTimeout(()=>{ el.classList.remove('show'); cutBusy=false; pumpCut(); }, 2550);
+}
+
+// ---------- events ----------
+const EVDEF={
+  storm:{banner:s=>`⚡嵐：観光ストップ・調子⤵ あと${s}s`,  end:'嵐が過ぎ去った。海はおだやか'},
+  tv:   {banner:s=>`📺TV取材：収入×2 あと${s}s`,          end:'取材終了。放送が楽しみだ!'},
+  break:{banner:s=>`🔧機材トラブル：研究停止 あと${s}s`,   end:'修理完了!ラボが再稼働した'},
+  jelly:{banner:s=>`🪼クラゲ大量発生：収入半減 あと${s}s`, end:'クラゲの群れが去っていった'},
+};
+function startEvent(type){
+  S.event = {type, until: Date.now()+40000};
+  if(type==='storm'){
+    tourists=[]; if(ferry.state!=='away') ferry.state='out';
+    // 揺れと不安で、ランダムな3人の調子が1段階ダウン(人魚は海の申し子なので平気)
+    const hit=[...S.crew].filter(c=>!c.sick && !c.mermaid && c.cond>1)
+      .sort(()=>Math.random()-0.5).slice(0,3);
+    hit.forEach(c=>{ c.cond=Math.max(1, c.cond-1); c.condP=0; });
+    toast('⚡ 嵐が来た! フェリー欠航・潜水艇も出航禁止…'
+      + (hit.length ? `\n${hit.map(c=>c.name).join('・')}の調子が下がった😟` : ''), true);
+    blip([196,165,131],'sawtooth',.22);
+  } else if(type==='tv'){
+    toast('📺 テレビ取材クルーが来た! 観光収入が2倍!!');
+    blip([523,659,784,1047]);
+  } else if(type==='break'){
+    toast('🔧 機材トラブル発生! 研究ラボが止まってしまった…', true);
+    blip([220,185],'sawtooth',.2);
+  } else {
+    toast('🪼 クラゲが大量発生! 観光客がこわがっている…', true);
+    blip([330,294],'sine',.18);
+  }
+}
+function endEvent(){
+  const tp=S.event.type; S.event=null;
+  toast(EVDEF[tp].end);
+}
+const evMult  = () => !S.event ? 1 : S.event.type==='tv' ? 2 : S.event.type==='storm' ? 0 : S.event.type==='jelly' ? 0.5 : 1;
+const resMult = () => (S.event && S.event.type==='break') ? 0 : 1;
+
+// ---------- save / load ----------
+function saveData(){
+  return {
+    v:1, t:Date.now(),
+    g:S.g, r:S.r, parts:S.parts, tickets:S.tickets, crewCap:S.crewCap,
+    life:S.life, ach:S.ach, login:S.login,
+    zoneUnlocked:S.zoneUnlocked, dex:S.dex, started:S.started,
+    slots:S.slots.map(s=>({b:s.b, blv:s.blv, owned:s.owned})),
+    crew:S.crew.map(c=>({name:c.name,star:c.star,main:c.main,stats:c.stats,skill:c.skill,skillFx:c.skillFx,skillD:c.skillD,mermaid:c.mermaid,hair:c.hair,skin:c.skin,xp:c.xp,clv:c.clv,hp:Math.round(c.hp),cond:c.cond,sick:c.sick,sickT:c.sickT||0})),
+    exps: S.exps.map(e=>({zone:e.zone, dur:e.dur, rem:Math.max(0,(e.t0+e.dur*1000-Date.now())/1000), pi:S.crew.findIndex(c=>c.id===e.pid)})),
+    subs: S.subs,
+    guests: S.guests,
+    gen: S.gen, relics: S.relics, relicUp: S.relicUp,
+    quest: S.quest,
+    tut: S.tut, tutDoneAt: S.tutDoneAt||0,
+    abyss: S.abyss,
+    wkc: S.wkc,
+    freeWarp: S.freeWarp,
+    warpN: S.warpN,
+    abyssExp: S.abyssExp ? {dur:S.abyssExp.dur, rem:Math.max(0,(S.abyssExp.t0+S.abyssExp.dur*1000-Date.now())/1000), pi:S.crew.findIndex(c=>c.id===S.abyssExp.pid)} : null,
+    log: (S.log||[]).slice(0,50),
+    items: S.items,
+    buffs: {speed:Math.max(0,(S.buffs.speed-Date.now())/1000), gold:Math.max(0,(S.buffs.gold-Date.now())/1000), luck2:Math.max(0,(S.buffs.luck2-Date.now())/1000)},
+    mis: S.mis,
+    sound: audio.on, vol: audio.vol, bigFont: S.bigFont?1:0,
+  };
+}
+function applySave(d){
+  S.g=d.g||0; S.r=d.r||0; S.parts=d.parts||0; S.tickets=d.tickets||0; S.crewCap=d.crewCap||4;
+  S.life=d.life||{exp:0,gacha:0,earn:0}; S.ach=d.ach||{}; S.login=d.login||{last:'',day:0};
+  S.zoneUnlocked=d.zoneUnlocked||1; S.dex=d.dex||{};
+  if((d.slots||[]).length===24){
+    // 旧形式(横拡張なし)はpos1スロットに順番どおり復元
+    const p1=S.slots.filter(s=>s.pos===1);
+    d.slots.forEach((sd,i)=>{ if(p1[i]){ p1[i].b=sd.b; p1[i].blv=sd.blv||1; } });
+    S.slots.forEach(s=>{ if(s.pos>1){ s.owned=false; s.b=null; s.blv=1; } });
+  } else {
+    (d.slots||[]).forEach((sd,i)=>{ if(S.slots[i]){
+      S.slots[i].b=sd.b; S.slots[i].blv=sd.blv||1;
+      S.slots[i].owned = sd.owned!==undefined ? sd.owned : (S.slots[i].pos===1);
+    }});
+  }
+  S.crew = (d.crew||[]).map(cd=>{
+    const c={id:'c'+(crewSeq++), xp:0, clv:1, hp:100, cond:3, condP:0, sick:false, sickT:0, ...cd};
+    if(c.stats && c.stats.humor===undefined) c.stats.humor=Math.max(1, c.star||1);   // 旧セーブ互換
+    if(c.skillFx && !c.skillD){ const sp=SPSKILL.find(s=>s.fx===c.skillFx); if(sp) c.skillD=sp.d; }
+    c.spr=makeCrewSprite(c); return c;
+  });
+  S.subs = Math.min(4, d.subs||1);
+  S.guests = (d.guests && d.guests.key) ? {prev:0, total:0, ...d.guests} : {key:dayKey(), n:0, prev:0, total:0};
+  S.gen = d.gen||1; S.relics = d.relics||0;
+  S.relicUp = {tour:0,res:0,exp:0,crew:0,luck:0, ...(d.relicUp||{})};
+  S.quest = d.quest||null;
+  S.tut = (d.tut!==undefined) ? d.tut : 99;   // セーブ読込は経験者扱い(新規開始はapplySaveを通らない)
+  S.tutDoneAt = d.tutDoneAt||0;
+  S.abyss = (d.abyss && typeof d.abyss.d==='number') ? d.abyss : {d:0,best:0};
+  S.wkc = (d.wkc && d.wkc.key) ? d.wkc : {key:null, n:0, done:false};
+  S.freeWarp = (d.freeWarp && d.freeWarp.key) ? d.freeWarp : {key:null, used:false};
+  S.warpN = (d.warpN && d.warpN.key) ? d.warpN : {key:null, n:[0,0,0,0,0]};
+  S.abyssExp = d.abyssExp ? {dur:d.abyssExp.dur, t0:Date.now()-(d.abyssExp.dur-d.abyssExp.rem)*1000, pid:(d.abyssExp.pi>=0 && S.crew[d.abyssExp.pi])?S.crew[d.abyssExp.pi].id:undefined} : null;
+  if(d.vol!==undefined){ audio.vol=+d.vol; $('volSlider').value=audio.vol; $('volVal').textContent=audio.vol+'%'; applyVol(); }
+  S.bigFont = !!d.bigFont; applyFont();
+  $('fontBtn').textContent='文字サイズ：'+(S.bigFont?'大きめ':'標準');
+  S.log = d.log||[];
+  S.items = d.items||{};
+  const bb=d.buffs||{};
+  S.buffs = {speed:Date.now()+(bb.speed||0)*1000, gold:Date.now()+(bb.gold||0)*1000, luck2:Date.now()+(bb.luck2||0)*1000};
+  S.exps = (d.exps||[]).map(e=>({zone:e.zone, dur:e.dur, t0: Date.now()-(e.dur-e.rem)*1000, pid:(e.pi>=0 && S.crew[e.pi]) ? S.crew[e.pi].id : undefined}));
+  if(d.exp) S.exps.push({zone:d.exp.zone, dur:d.exp.dur, t0: Date.now()-(d.exp.dur-d.exp.rem)*1000});  // 旧形式互換
+  if(d.mis && d.mis.d && d.mis.w){ S.mis = d.mis; misReset(); }
+  asgDirty=true;
+}
+function persist(){
+  try{ localStorage.setItem('dss_save', JSON.stringify(saveData())); }catch(e){}
+}
+function loadPersist(){
+  try{ const s=localStorage.getItem('dss_save'); if(s) return JSON.parse(s); }catch(e){}
+  return null;
+}
+setInterval(()=>{ if(S.started) persist(); }, 30000);
+document.addEventListener('visibilitychange', ()=>{ if(document.hidden && S.started) persist(); });
+$('saveOut').onclick=()=>{
+  persist();
+  $('saveTa').value = btoa(unescape(encodeURIComponent(JSON.stringify(saveData()))));
+  $('saveTa').select();
+  toast('セーブコードを発行!コピーして保管しよう');
+};
+$('saveIn').onclick=()=>{
+  try{
+    const d=JSON.parse(decodeURIComponent(escape(atob($('saveTa').value.trim()))));
+    applySave(d);
+    if(d.started){ S.started=true; $('intro').style.display='none'; }
+    refreshHud(); toast('セーブコードを読み込んだ!');
+  }catch(e){ toast('コードが正しくないみたい…', true); }
+};
+$('saveDel').onclick=()=>{
+  try{ localStorage.removeItem('dss_save'); }catch(e){}
+  toast('自動保存データを削除した(再読込でリセット)');
+};
+
+// ---------- offline reward ----------
+function computeAway(savedT){
+  const el = Math.min((Date.now()-savedT)/1000, 8*3600);   // 最大8時間
+  if(el < 60) return null;
+  const A=assignments();
+  let gps=0, rps=0;
+  S.slots.filter(s=>s.b==='cap').forEach((s,i)=>{ const c=A.caps[i]; if(c) gps+=capIncomeOf(c)*lvMult(s); });
+  S.slots.filter(s=>s.b==='lab').forEach((s,i)=>{ const c=A.labs[i]; if(c) rps+=labOutOf(c)*lvMult(s); });
+  return {el, g:Math.floor(gps*el*vaultEff()), r:Math.floor(rps*el*vaultEff()), eff:vaultEff()};
+}
+$('awayOk').onclick=()=>{ $('awayModal').classList.remove('open'); checkLogin(); };
+
+// ---------- missions ----------
+const DAILY=[
+  {id:'exp3',    name:'潜水艇で3回探索する',        tgt:3,   key:'exp',   rw:{g:200}},
+  {id:'gacha1',  name:'ガチャを1回引く',            tgt:1,   key:'gacha', rw:{parts:1}},
+  {id:'skill2',  name:'スキル発動を2回見る',        tgt:2,   key:'skill', rw:{tk:1}},
+  {id:'earn500', name:'観光収入で500G稼ぐ',         tgt:500, key:'earn',  rw:{r:50}},
+];
+const WEEKLY=[
+  {id:'exp15',   name:'潜水艇で15回探索する',       tgt:15,    key:'exp',   rw:{g:1500}},
+  {id:'earnW',   name:'観光収入で10,000G稼ぐ',      tgt:10000, key:'earn',  rw:{tk:3}},
+  {id:'resW',    name:'研究ptを3,000pt獲得する',    tgt:3000,  key:'res',   rw:{g:800, parts:2}},
+  {id:'gacha10', name:'ガチャを10回引く',           tgt:10,    key:'gacha', rw:{tk:2, r:100}},
+];
+// ---------- achievements (恒久) ----------
+const ACH=[
+  {id:'exp10',  name:'探索デビュー：累計10回探索',     chk:()=>S.life.exp>=10,  rw:{tk:1}},
+  {id:'exp50',  name:'ベテラン船長：累計50回探索',     chk:()=>S.life.exp>=50,  rw:{tk:2, g:500}},
+  {id:'exp200', name:'深海の主：累計200回探索',        chk:()=>S.life.exp>=200, rw:{tk:5}},
+  {id:'dex5',   name:'かけだし学者：図鑑5種',          chk:()=>discCount()>=5,  rw:{parts:2}},
+  {id:'dex10',  name:'いっぱしの学者：図鑑10種',       chk:()=>discCount()>=10, rw:{tk:2}},
+  {id:'dexAll', name:'図鑑コンプリート!!(通常種)',     chk:()=>CREATURES.filter(c=>!c.hidden).every(c=>S.dex[c.id]), rw:{tk:10, g:5000}},
+  {id:'mermaid',name:'人魚伝説：人魚マーメと出会う',    chk:()=>!!S.dex.mermaid, rw:{tk:5, g:2000}},
+  {id:'guest100', name:'人気スポット：累計来場100人',   chk:()=>(S.guests&&S.guests.total||0)>=100,  rw:{g:500}},
+  {id:'guest1000',name:'海の観光名所：累計来場1,000人', chk:()=>(S.guests&&S.guests.total||0)>=1000, rw:{tk:2, parts:3}},
+  {id:'abyss1k', name:'深淵の入口：未踏深層1,000m',     chk:()=>(S.abyss&&S.abyss.best||0)>=1000,  rw:{g:1000}},
+  {id:'abyss5k', name:'闇のさらに下へ：未踏深層5,000m', chk:()=>(S.abyss&&S.abyss.best||0)>=5000,  rw:{tk:3}},
+  {id:'abyss10k',name:'前人未到：未踏深層10,000m',      chk:()=>(S.abyss&&S.abyss.best||0)>=10000, rw:{tk:5, parts:9}},
+  {id:'star5',  name:'伝説との出会い：★5クルー獲得',   chk:()=>S.crew.some(c=>c.star===5), rw:{g:1000}},
+  {id:'g30',    name:'スカウトの鬼：累計30回スカウト', chk:()=>S.life.gacha>=30, rw:{tk:3}},
+  {id:'lv3',    name:'匠の技：施設をLv3にする',        chk:()=>S.slots.some(s=>s.b&&s.blv>=3), rw:{parts:3}},
+  {id:'lv10',   name:'熟練の技：施設をLv10にする',      chk:()=>S.slots.some(s=>s.b&&s.blv>=10), rw:{parts:6, g:2000}},
+  {id:'lv20',   name:'神の手：施設をLv20にする',        chk:()=>S.slots.some(s=>s.b&&s.blv>=20), rw:{tk:3, g:10000}},
+  {id:'abyss',  name:'深淵へ：超深海帯を解放',         chk:()=>S.zoneUnlocked>=4, rw:{tk:5}},
+  {id:'earn1',  name:'観光王：累計10,000G稼ぐ',        chk:()=>S.life.earn>=10000,  rw:{tk:2}},
+  {id:'earn2',  name:'観光帝：累計100,000G稼ぐ',       chk:()=>S.life.earn>=100000, rw:{tk:10}},
+];
+function applyRw(rw){
+  if(rw.g) S.g+=rw.g;
+  if(rw.r) S.r+=rw.r;
+  if(rw.parts) S.parts+=rw.parts;
+  if(rw.tk) S.tickets+=rw.tk;
+}
+// ---------- login bonus ----------
+const LOGINRW=[{g:100},{parts:1},{tk:1},{g:300},{parts:2},{r:100},{tk:3,g:500}];
+function checkLogin(){
+  const dk=dayKey();
+  if(S.login.last===dk || !S.started) return;
+  S.login.last=dk;
+  S.login.day=(S.login.day%7)+1;
+  const rw=LOGINRW[S.login.day-1];
+  applyRw(rw);
+  const grid=$('loginGrid'); grid.innerHTML='';
+  LOGINRW.forEach((r,i)=>{
+    const d=i+1, cell=document.createElement('div');
+    cell.className='stamp'+(d<S.login.day?' got':d===S.login.day?' today':'');
+    cell.innerHTML=`${d}日目<br><span class="fish">${d<=S.login.day?'🐟':'・'}</span><br>${rwText(r)}`;
+    grid.appendChild(cell);
+  });
+  $('loginTx').innerHTML=`${S.login.day}日目のごほうび：<b style="color:#ffd97a">${rwText(rw)}</b>`;
+  $('loginModal').classList.add('open');
+  blip([523,659,784],'triangle');
+  refreshHud();
+}
+$('loginOk').onclick=()=> $('loginModal').classList.remove('open');
+const isNight = () => { const h=new Date().getHours(); return h>=19 || h<5; };
+function dayKey(){ const d=new Date(); return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate(); }
+function weekKey(){
+  const d=new Date(), m=new Date(d);
+  m.setDate(d.getDate()-((d.getDay()+6)%7));            // 直近の月曜
+  return m.getFullYear()+'-'+(m.getMonth()+1)+'-'+m.getDate();
+}
+function freshD(){ return {key:dayKey(),  exp:0, gacha:0, skill:0, earn:0, claimed:{}}; }
+function freshW(){ return {key:weekKey(), exp:0, nw:0, earn:0, res:0, up:0, gacha:0, claimed:{}}; }
+S.mis = {d:freshD(), w:freshW()};
+function misReset(){
+  if(S.mis.d.key!==dayKey()){ S.mis.d=freshD(); }
+  if(S.mis.w.key!==weekKey()){ S.mis.w=freshW(); }
+}
+function misAdd(scope, key, n=1){ misReset(); S.mis[scope][key]+=n; }
+function rwText(rw){
+  return [rw.g?`${rw.g}G`:null, rw.r?`研究${rw.r}pt`:null, rw.parts?`パーツ×${rw.parts}`:null, rw.tk?`チケット×${rw.tk}`:null].filter(Boolean).join(' + ');
+}
+function anyClaim(){
+  return DAILY.some(m=> S.mis.d[m.key]>=m.tgt && !S.mis.d.claimed[m.id])
+      || WEEKLY.some(m=> S.mis.w[m.key]>=m.tgt && !S.mis.w.claimed[m.id])
+      || ACH.some(a=> !S.ach[a.id] && a.chk());
+}
+function fmtLeft(ms){
+  const h=Math.floor(ms/3600000), mn=Math.floor(ms%3600000/60000);
+  return h>=24 ? Math.floor(h/24)+'日'+(h%24)+'時間' : h+'時間'+mn+'分';
+}
+function renderMis(){
+  misReset();
+  const body=$('misBody'); body.innerHTML='';
+  // 依頼ボード
+  const qd=document.createElement('div'); qd.className='item';
+  if(S.quest){
+    const qc=CREATURES.find(x=>x.id===S.quest.cid);
+    const qleft=Math.max(0, Math.ceil((S.quest.until-Date.now())/1000));
+    qd.innerHTML=`<div class="tx"><b>📦 依頼：${qc.name}を捕まえて!</b>`+
+      `<small>${S.quest.src}より／${ZONES[qc.z].name}・${starTx(qc.rare)}${S.dex[qc.id]?'(発見済の種!再捕獲でOK)':''}</small>`+
+      `<small>報酬：${fmt(S.quest.g)}G${S.quest.tk?` + チケット${S.quest.tk}`:''}／のこり ${Math.floor(qleft/60)}分${qleft%60}秒</small></div>`;
+  } else {
+    qd.innerHTML=`<div class="tx"><b>📦 依頼ボード</b><small>つぎの依頼を待っている…</small></div>`;
+  }
+  body.appendChild(qd);
+  const now=new Date();
+  const midnight=new Date(now); midnight.setHours(24,0,0,0);
+  const nextMon=new Date(now); nextMon.setDate(now.getDate()+((8-now.getDay())%7||7)); nextMon.setHours(0,0,0,0);
+  const sec=(title,left)=>{ const h=document.createElement('div'); h.className='misHead';
+    h.innerHTML=`<span>${title}</span><small>リセットまで ${fmtLeft(left)}</small>`; return h; };
+  const row=(m, st)=>{
+    const cur=Math.min(st[m.key], m.tgt), done=st[m.key]>=m.tgt, claimed=!!st.claimed[m.id];
+    const div=document.createElement('div'); div.className='item'+(claimed?' misDone':'');
+    const tx=document.createElement('div'); tx.className='tx';
+    tx.innerHTML=`<b ${claimed?'style="color:#3f5c7e"':''}>${m.name}</b>
+      <small>報酬：${rwText(m.rw)}　(${fmt(cur)}/${fmt(m.tgt)})</small>
+      <span class="mbar${done?' full':''}"><i style="width:${Math.floor(cur/m.tgt*100)}%"></i></span>`;
+    div.appendChild(tx);
+    if(claimed){
+      const ok=document.createElement('div'); ok.style.cssText='color:#3fa37a;font-size:12px;flex:none;'; ok.textContent='✓済';
+      div.appendChild(ok);
+    } else if(done){
+      const btn=document.createElement('button'); btn.className='buyBtn gold'; btn.textContent='受取!';
+      btn.onclick=()=>{
+        st.claimed[m.id]=1;
+        applyRw(m.rw);
+        toast(`ミッション達成! ${rwText(m.rw)} を受け取った`);
+        blip([659,784,1047],'triangle');
+        renderMis(); refreshHud();
+      };
+      div.appendChild(btn);
+    }
+    return div;
+  };
+  body.appendChild(sec('☀ デイリーミッション', midnight-now));
+  DAILY.forEach(m=> body.appendChild(row(m, S.mis.d)));
+  body.appendChild(sec('📅 ウィークリーミッション', nextMon-now));
+  WEEKLY.forEach(m=> body.appendChild(row(m, S.mis.w)));
+  // 実績(恒久)
+  const ah=document.createElement('div'); ah.className='misHead';
+  ah.innerHTML=`<span>🏆 実績</span><small>達成 ${ACH.filter(a=>S.ach[a.id]).length}/${ACH.length}</small>`;
+  body.appendChild(ah);
+  ACH.forEach(a=>{
+    const done=a.chk(), claimed=!!S.ach[a.id];
+    const div=document.createElement('div'); div.className='item'+(claimed?' misDone':'');
+    const tx=document.createElement('div'); tx.className='tx';
+    tx.innerHTML=`<b ${claimed?'style="color:#3f5c7e"':''}>${a.name}</b><small>報酬：${rwText(a.rw)}</small>`;
+    div.appendChild(tx);
+    if(claimed){
+      const ok=document.createElement('div'); ok.style.cssText='color:#3fa37a;font-size:12px;flex:none;'; ok.textContent='✓済';
+      div.appendChild(ok);
+    } else if(done){
+      const btn=document.createElement('button'); btn.className='buyBtn gold'; btn.textContent='受取!';
+      btn.onclick=()=>{
+        S.ach[a.id]=1; applyRw(a.rw);
+        toast(`実績解除! ${rwText(a.rw)} を受け取った`);
+        blip([659,784,1047,1319],'triangle');
+        renderMis(); refreshHud();
+      };
+      div.appendChild(btn);
+    }
+    body.appendChild(div);
+  });
+}
+$('btnMis').onclick=()=>{ renderMis(); openPanel('misPanel'); };
+
+// ---------- economy ----------
+let condTimer = 0;
+const extOf = s => S.slots.find(o=>o.zone===s.zone && o.lv===s.lv && o.side===s.side && o.pos===s.pos+1);
+setInterval(()=>{
+  if(!S.started) return;
+  misReset();
+  const A = assignments();
+  const m = evMult() * (buffOn('gold') ? 1.5 : 1) * (1 + 0.04*adPow()) * relicMul() * (wkIs('ooshike')?1.3:1);
+  const rm = resMult();
+  // 収入(体力による効率を反映)
+  S.slots.filter(s=>s.b==='cap').forEach((s,i)=>{ const c=A.caps[i]; if(c){ const gain=capIncomeOf(c)*lvMult(s)*m*effOf(c); S.g += gain; S.mis.d.earn += gain; S.mis.w.earn=(S.mis.w.earn||0)+gain; S.life.earn += gain; gainXp(c,1); } });
+  S.slots.filter(s=>s.b==='lab').forEach((s,i)=>{ const c=A.labs[i]; if(c){ const rg=labOutOf(c)*lvMult(s)*rm*effOf(c)*plabMul()*relicResMul()*(wkIs('kenkyufes')?1.5:1); S.r += rg; S.mis.w.res=(S.mis.w.res||0)+rg; gainXp(c,1); } });
+  // ----- 新施設:みやげ屋・植物園・カジノ・訓練室(担当クルーがいる時だけ稼働) -----
+  S.slots.filter(s=>s.b==='miyage' && facOn(s)).forEach(s=>{ const gain=0.1*discCount()*lvMult(s)*staffMul(s)*m; S.g+=gain; S.mis.d.earn+=gain; S.mis.w.earn=(S.mis.w.earn||0)+gain; S.life.earn+=gain; });
+  S.slots.filter(s=>s.b==='garden' && facOn(s)).forEach(s=>{ const rg=1*lvMult(s)*staffMul(s); S.r += rg; S.mis.w.res=(S.mis.w.res||0)+rg; });   // 機材トラブルでも元気な海藻たち
+  S.slots.filter(s=>s.b==='casino' && facOn(s)).forEach(s=>{
+    if(Math.random()<0.002){
+      const v=Math.round(1000*lvMult(s)*staffMul(s)); S.g+=v;
+      toast(`🎰 カジノで大当たり!! +${fmt(v)}G`); blip([784,988,1175,1568],'triangle');
+      const r=slotRect(s); floaters.push({x:r.x+18, y:r.y-3, txt:'JACKPOT!!', col:'#ffd97a', life:90});
+    } else if(Math.random()<0.05){
+      const v=Math.round(40*lvMult(s)*staffMul(s)); S.g+=v;
+      const r=slotRect(s); floaters.push({x:r.x+24, y:r.y+4, txt:'+'+v, col:'#ffd97a', life:45});
+    }
+  });
+  S.slots.filter(s=>s.b==='train' && facOn(s)).forEach(s=>{
+    const tgt=[...S.crew].filter(c=>!c.sick && c.clv<10).sort((a,b)=>a.clv-b.clv)[0];
+    if(tgt) gainXp(tgt, lvMult(s)*staffMul(s));
+  });
+  // 人魚の泉(人魚が在籍していると効果2倍)
+  const springMul = S.crew.some(c=>c.mermaid) ? 2 : 1;
+  S.slots.filter(s=>s.b==='spring' && facOn(s)).forEach(s=>{
+    S.crew.forEach(c=>{ if(!c.sick){ c.hp=Math.min(100, c.hp+0.3*lvMult(s)*springMul*staffMul(s)); c.condP += 0.008*lvMult(s)*springMul*staffMul(s); } });
+  });
+  // 一般施設のスタッフも働いている(経験値が入る)
+  Object.values(A.staff).forEach(arr=>{ if(arr) arr.forEach(c=> gainXp(c,1)); });
+  // ----- 体力の消耗と自然回復 -----
+  const working=new Set([...A.caps, ...A.labs]);
+  Object.values(A.staff).forEach(arr=>{ if(arr) arr.forEach(c=>working.add(c)); });
+  working.forEach(c=> c.hp=Math.max(0, c.hp - (c.skillFx==='tough' ? 0.25 : 0.5)*relicDrain()));
+  S.crew.forEach(c=>{ if(!working.has(c)) c.hp=Math.min(100, c.hp+(c.sick?0.2:0.3)); });
+  // 自然治癒:医務室がなくても病気はゆっくり(医務室Lv1の1/4速度)治る…全員病気の詰み防止
+  S.crew.forEach(c=>{
+    if(c.sick){
+      c.sickT -= 0.25;
+      if(c.sickT<=0){ c.sick=false; c.cond=Math.max(1, c.cond); asgDirty=true; toast(`${c.name}が自力で回復した!`); }
+    }
+  });
+  // ----- 厚生施設の回復(担当クルーがいる時だけ稼働、休憩室はセルフサービス) -----
+  const byHp = S.crew.filter(c=>!c.sick).sort((a,b)=>a.hp-b.hp);
+  S.slots.filter(s=>s.b==='rest').forEach(s=>{
+    const c=byHp[0]; if(c){ c.hp=Math.min(100, c.hp+1*lvMult(s)); c.condP+=0.015*lvMult(s); }
+  });
+  S.slots.filter(s=>s.b==='restaurant' && facOn(s)).forEach(s=>{
+    byHp.slice(0,2).forEach(c=> c.hp=Math.min(100, c.hp+2*lvMult(s)*staffMul(s)));
+  });
+  S.slots.filter(s=>s.b==='onsen' && facOn(s)).forEach(s=>{
+    byHp.slice(0,3).forEach(c=>{ c.hp=Math.min(100, c.hp+2.5*lvMult(s)*staffMul(s)); c.condP+=0.02*lvMult(s)*staffMul(s); });
+  });
+  S.slots.filter(s=>s.b==='gym' && facOn(s)).forEach(s=>{
+    S.crew.forEach(c=>{ if(!c.sick) c.hp=Math.min(100, c.hp+0.4*lvMult(s)*staffMul(s)); });
+  });
+  const byCond = S.crew.filter(c=>!c.sick).sort((a,b)=>(a.cond+a.condP)-(b.cond+b.condP));
+  S.slots.filter(s=>s.b==='game' && facOn(s)).forEach(s=>{
+    const c=byCond[0]; if(c) c.condP += lvMult(s)*staffMul(s)/30;
+  });
+  S.slots.filter(s=>s.b==='hall' && facOn(s)).forEach(s=>{
+    S.crew.forEach(c=>{ if(!c.sick) c.condP += lvMult(s)*staffMul(s)/60; });
+    S.g += 6*lvMult(s)*staffMul(s)*m;
+  });
+  // 調子ゲージの繰り上げ
+  S.crew.forEach(c=>{
+    while(c.condP>=1){ c.condP-=1; if(c.cond<5) c.cond++; else { c.condP=0; break; } }
+  });
+  // ----- 医務室での治療 -----
+  const meds=S.slots.filter(s=>s.b==='med');
+  const sicks=S.crew.filter(c=>c.sick);
+  meds.forEach((s,i)=>{
+    const c=sicks[i];
+    if(c){
+      c.sickT -= lvMult(s);
+      if(c.sickT<=0){
+        c.sick=false; c.hp=Math.max(c.hp,70); c.cond=3; c.condP=0; asgDirty=true;
+        toast(`🌸 ${c.name}が元気になった!`); blip([523,659],'triangle');
+      }
+    }
+  });
+  // ----- 調子のランダムウォークと発病(45秒ごと) -----
+  if(++condTimer>=45){
+    condTimer=0;
+    const gymPow=Math.min(0.35, S.slots.filter(s=>s.b==='gym' && facOn(s)).reduce((a,s)=>a+0.1*lvMult(s)*staffMul(s),0))
+                + Math.min(0.2, facPow('spring', 0.05) * (S.crew.some(c=>c.mermaid)?2:1));
+    S.crew.forEach(c=>{
+      if(c.sick) return;
+      // 調子はやや上向きやすい(0.5→0.55)+施設・スキルの保護
+      const upP = 0.55 + gymPow + (c.skillFx==='positive' ? 0.2 : 0);
+      if(Math.random() < upP) c.cond=Math.min(5,c.cond+1);
+      else c.cond=Math.max(1,c.cond-1);
+      // 発病率を全体的に引き下げ(😫30%→15%、🙁15%→6%、😐5%→1.5%、🙂以上は安全)
+      let sickP = {1:0.15, 2:0.06, 3:0.015, 4:0, 5:0}[c.cond];
+      if(c.skillFx==='immune') sickP *= 0.3;
+      sickP *= relicSick();
+      if(Math.random()<sickP){
+        c.sick=true; c.sickT=30; asgDirty=true;
+        toast(`😷 ${c.name}が病気になってしまった…医務室で療養が必要!`, true);
+        blip([294,247],'sawtooth',.18);
+      }
+    });
+  }
+  checkLogin();   // 日付が変わったらログインボーナス
+  // スキル発動判定
+  // スキル発動判定(待機クルーのサポートスキルも発動する)
+  for(const c of S.crew) if(!c.sick && Math.random() < 0.0045*c.star) triggerSkill(c);
+  // イベント
+  if(S.event){
+    if(Date.now() > S.event.until) endEvent();
+    else $('evBanner').textContent = EVDEF[S.event.type].banner(Math.ceil((S.event.until-Date.now())/1000));
+  } else if(eventAllowed() && countB('cap')>0 && Math.random() < (wkIs('ooshike')?2:1)/110){
+    const pool=['storm','tv','break','jelly'];
+    startEvent(pool[Math.floor(Math.random()*pool.length)]);
+  }
+  $('evBanner').style.display = S.event ? 'block' : 'none';
+  // バフ表示
+  const bs=Object.keys(ITEMS).filter(id=>buffOn(ITEMS[id].buff))
+    .map(id=>`${ITEMS[id].icon}${Math.ceil((S.buffs[ITEMS[id].buff]-Date.now())/1000)}s`);
+  $('buffBar').textContent = bs.join(' ');
+  $('buffBar').style.display = bs.length ? 'block' : 'none';
+  if($('subPanel').classList.contains('open')) renderSub();   // 探索カウントダウンを生更新
+  S.incHist.push(Math.round(((S.life.earn||0) - (S.__lastEarn||S.life.earn||0))*10)/10);
+  S.__lastEarn = S.life.earn||0;
+  if(S.incHist.length>60) S.incHist.shift();
+  if(S.abyssExp && Date.now() > S.abyssExp.t0 + S.abyssExp.dur*1000) resolveAbyss();
+  wkcRoll();
+  questTick();
+  tutTick();
+  refreshOpenPanel();   // 所持金・研究ptの変動をボタンの有効/無効に反映
+  refreshHud();
+}, 1000);
+
+// 開いているパネルを再描画してG/研究ptの増減をボタン状態へ反映する
+// (スクロール位置は維持。ガチャ演出中のクルー名簿は触らない)
+function refreshOpenPanel(){
+  const redraw=(bodyEl, fn)=>{ const st=bodyEl.scrollTop; fn(); bodyEl.scrollTop=st; };
+  if($('buildPanel').classList.contains('open') && pickedSlot && !pickedSlot.b && pickedSlot.owned){
+    redraw($('buildBody'), renderBuild);
+  } else if($('modPanel').classList.contains('open') && pickedSlot){
+    redraw($('modBody'), pickedSlot.b ? renderMod : renderSlotBuy);
+  } else if($('crewPanel').classList.contains('open') && !$('gachaModal').classList.contains('open') && !$('multiModal').classList.contains('open')){
+    redraw($('crewList'), renderCrew);
+  } else if($('misPanel').classList.contains('open')){
+    redraw($('misBody'), renderMis);
+  } else if($('helpPanel').classList.contains('open')){
+    renderGuestReport(); renderPrestige();   // レポートと移転情報だけ更新(セーブ欄は触らない)
+  }
+}
+
+// ---------- drawing ----------
+function drawBuilding(s, crews){
+  const r=slotRect(s), b=BTYPES[s.b], t=performance.now()/1000;
+  if(b.big){ r.w = 62; if(s.side<0) r.x -= 32; }   // 大型施設は2マス分(左側は外側=左へ拡張)
+  // 接続クランプ(シャフト側の縁を金具でとめる)
+  const clampX = s.side<0 ? r.x+r.w-1 : r.x-1;
+  ctx.fillStyle='#5b8cc0'; ctx.fillRect(clampX, r.y+r.h/2-4, 2, 8);
+  ctx.fillStyle='#22394f'; ctx.fillRect(clampX, r.y+r.h/2-1, 2, 2);
+  // body
+  ctx.fillStyle='#101d2c'; ctx.fillRect(r.x-1,r.y-1,r.w+2,r.h+2);
+  ctx.fillStyle=b.col; ctx.fillRect(r.x,r.y,r.w,r.h);
+  ctx.fillStyle='rgba(0,0,0,.25)'; ctx.fillRect(r.x,r.y+r.h-5,r.w,5);
+  // windows(Lv14+は金縁の高級窓)
+  if(s.blv>=14){
+    ctx.fillStyle='#b08a2e';
+    for(let wx=4; wx<=r.w-8; wx+=9) ctx.fillRect(r.x+wx-1, r.y+4, 8, 8);
+  }
+  ctx.fillStyle=b.win;
+  for(let wx=4; wx<=r.w-8; wx+=9) ctx.fillRect(r.x+wx, r.y+5, 6, 6);
+  // ---- 外観進化 ----
+  if(s.blv>=7){                                  // Lv7+:屋根アンテナと点滅ランプ
+    ctx.fillStyle='#7a8a9a'; ctx.fillRect(r.x+r.w-7, r.y-4, 1, 4);
+    ctx.fillStyle = Math.floor(t*2)%2 ? '#ff6a6a' : '#7a2a2a';
+    ctx.fillRect(r.x+r.w-8, r.y-6, 3, 2);
+  }
+  if(s.blv>=20){                                 // Lv20:金の星章+きらめき
+    ctx.fillStyle='#ffd97a';
+    ctx.fillRect(r.x+2, r.y+1, 3, 3); ctx.fillRect(r.x+3, r.y, 1, 5); ctx.fillRect(r.x+1, r.y+2, 5, 1);
+    if(Math.floor(t*3)%4===0){ ctx.fillStyle='#fff'; ctx.fillRect(r.x+1+Math.floor(t*7)%Math.max(1,r.w-2), r.y+1, 1, 1); }
+  }
+  // 施設別の演出
+  if(s.b==='tank'){                             // ガラス水槽の中を発見済みの生物が泳ぐ
+    ctx.fillStyle='#0d3550'; ctx.fillRect(r.x+3, r.y+3, r.w-6, r.h-9);
+    ctx.fillStyle='rgba(159,220,255,.25)'; ctx.fillRect(r.x+3, r.y+3, r.w-6, 3);
+    if(!s.__fishT || t>s.__fishT){              // 20秒ごとに展示替え
+      const got=CREATURES.filter(c=>S.dex[c.id] && c.kind!=='obj' && !c.hidden && SPR[c.id].width<=18);
+      s.__fish = got.sort(()=>Math.random()-0.5).slice(0,2);
+      s.__fishT = t+20;
+    }
+    if(s.__fish){
+      ctx.save(); ctx.beginPath(); ctx.rect(r.x+3, r.y+3, r.w-6, r.h-9); ctx.clip();
+      s.__fish.forEach((c,i)=>{
+        const sp=SPR[c.id];
+        const ph=t*(0.5+i*0.3)+i*3;
+        const fx=r.x+5 + ((Math.sin(ph)*0.5+0.5)*(r.w-12-sp.width));
+        const fy=r.y+4 + i*7 + Math.sin(t*1.7+i)*1.5;
+        const flip=Math.cos(ph)<0;
+        if(flip){ ctx.save(); ctx.translate(fx+sp.width,0); ctx.scale(-1,1); ctx.drawImage(sp,0,fy); ctx.restore(); }
+        else ctx.drawImage(sp, fx, fy);
+      });
+      // あぶく
+      ctx.fillStyle='rgba(200,240,255,.6)';
+      ctx.fillRect(r.x+8+(Math.floor(t*3)%3), r.y+4+((r.h-14)-(t*6)%(r.h-12)), 1,1);
+      ctx.restore();
+    }
+  }
+  if(s.b==='med'){                              // 赤十字
+    ctx.fillStyle='#fff'; ctx.fillRect(r.x+r.w-9, r.y+2, 6,6);
+    ctx.fillStyle='#c93a3a'; ctx.fillRect(r.x+r.w-8, r.y+4, 4,2); ctx.fillRect(r.x+r.w-7, r.y+3, 2,4);
+  }
+  if(s.b==='rest' && Math.floor(t)%3===0){      // すやすやZ
+    ctx.fillStyle='#e4f0d0'; ctx.font='6px monospace';
+    ctx.fillText('z', r.x+r.w-7, r.y+4);
+  }
+  if(s.b==='onsen'){                            // 湯けむり
+    ctx.fillStyle='rgba(255,255,255,.5)';
+    for(let i=0;i<3;i++){
+      const sy=((t*8 + i*9)%22);
+      ctx.fillRect(r.x+10+i*16 + Math.round(Math.sin(t*2+i)*2), r.y-2-Math.floor(sy/4), 2,2);
+    }
+  }
+  if(s.b==='hall' && Math.random()<.015){       // 音符
+    floaters.push({x:r.x+r.w/2, y:r.y-2, txt:'♪', col:'#c9a0ff', life:40});
+  }
+  if(s.b==='gym'){                              // グラウンドのライン
+    ctx.fillStyle='rgba(255,255,255,.4)';
+    ctx.fillRect(r.x+4, r.y+r.h-7, r.w-8, 1);
+  }
+  // level pips
+  if(s.blv>1){
+    ctx.fillStyle='#ffd97a';
+    for(let i=0;i<s.blv-1;i++) ctx.fillRect(r.x+2+i*4, r.y+1, 2,2);
+  }
+  // 窓からのぞく観光客
+  if(s.b==='cap'){
+    const inside = tourists.filter(p=>p.st==='in').length;
+    if(inside>0){
+      ctx.fillStyle='#2c2620'; ctx.fillRect(r.x+5,r.y+6,3,1);
+      ctx.fillStyle='#ffd9b0'; ctx.fillRect(r.x+5,r.y+7,3,3);
+      if(inside>1){
+        ctx.fillStyle='#2c2620'; ctx.fillRect(r.x+14,r.y+6,3,1);
+        ctx.fillStyle='#ffd9b0'; ctx.fillRect(r.x+14,r.y+7,3,3);
+      }
+    }
+  }
+  // glow
+  if(s.b==='light'){
+    const g=ctx.createRadialGradient(r.x+r.w/2,r.y+r.h/2,2, r.x+r.w/2,r.y+r.h/2,46);
+    g.addColorStop(0,'rgba(255,244,170,.35)'); g.addColorStop(1,'rgba(255,244,170,0)');
+    ctx.fillStyle=g; ctx.fillRect(r.x+r.w/2-46,r.y+r.h/2-46,92,92);
+  }
+  // assigned crew (pixel characters)
+  if(b.crew>0){
+    if(crews && crews.length){
+      crews.slice(0, b.big?2:1).forEach((c,i)=>{
+        const wx = r.x + 6 + i*13 + Math.round(Math.sin(t*0.6 + r.y + i*2)*5);
+        const wy = r.y + r.h - 13 + (Math.floor(t*4 + r.x + i)%2);
+        ctx.drawImage(c.spr, wx, wy);
+        if(c.star===5 && Math.floor(t*3)%2===0){
+          ctx.fillStyle='#ffd97a'; ctx.fillRect(wx+10, wy-2, 1,1);
+        }
+      });
+    } else {
+      ctx.fillStyle='rgba(255,158,186,.9)';
+      ctx.font='6px monospace';
+      ctx.fillText('無人', r.x+9, r.y+r.h-3);
+    }
+  }
+}
+
+function drawPlus(s){
+  const r=slotRect(s), t=performance.now()/1000;
+  ctx.strokeStyle = 'rgba(127,231,212,'+(0.35+0.25*Math.sin(t*2))+')';
+  ctx.lineWidth=1; ctx.strokeRect(r.x+.5,r.y+.5,r.w-1,r.h-1);
+  ctx.fillStyle='rgba(127,231,212,.8)';
+  ctx.fillRect(r.x+r.w/2-4, r.y+r.h/2-1, 8,2);
+  ctx.fillRect(r.x+r.w/2-1, r.y+r.h/2-4, 2,8);
+}
+
+function drawBuySlot(s){
+  const r=slotRect(s), t=performance.now()/1000;
+  const a = 0.3 + 0.15*Math.sin(t*2);
+  ctx.fillStyle=`rgba(255,217,122,${a})`;
+  for(let x=r.x; x<r.x+r.w-1; x+=5){ ctx.fillRect(x,r.y,2,1); ctx.fillRect(x,r.y+r.h-1,2,1); }
+  for(let y=r.y; y<r.y+r.h-1; y+=5){ ctx.fillRect(r.x,y,1,2); ctx.fillRect(r.x+r.w-1,y,1,2); }
+  // コインアイコン
+  const mx=r.x+r.w/2, my=r.y+r.h/2;
+  ctx.fillStyle='#b08a2e'; ctx.fillRect(mx-3,my-4,6,8);
+  ctx.fillStyle='#ffd97a'; ctx.fillRect(mx-4,my-3,8,6);
+  ctx.fillStyle='#b08a2e'; ctx.fillRect(mx-1,my-2,2,4);
+}
+
+function draw(){
+  const t=performance.now()/1000;
+  const L=Math.round(camX);   // 画面左端のワールドX座標
+  ctx.setTransform(SC,0,0,SC, -Math.round(camX*SC), -Math.round(camY*SC));
+
+  // ----- background bands(昼夜で表情が変わる) -----
+  const night=isNight();
+  ctx.fillStyle = night ? '#0a1430' : '#7ec3e8';
+  ctx.fillRect(L-2,camY-10,VW+4,Y_WATER-(camY-10)); // sky
+  if(camY < Y_WATER){
+    if(night){
+      // 月
+      ctx.fillStyle='#fdf6d8';
+      ctx.fillRect(L+VW-28, 8, 9, 9); ctx.fillRect(L+VW-30, 10, 13, 5);
+      ctx.fillStyle='#0a1430'; ctx.fillRect(L+VW-25, 9, 5, 5);   // 三日月の影
+      // 星(ゆっくりまたたく)
+      ctx.fillStyle='#cfe0ff';
+      for(let i=0;i<14;i++){
+        const sx=L+((i*53+17)%(VW-8))+4, sy=4+((i*29)%(Y_WATER-14));
+        if((Math.floor(t*1.5)+i)%5!==0) ctx.fillRect(sx, sy, 1, 1);
+      }
+    } else {
+      // 太陽
+      ctx.fillStyle='#fff3b0';
+      ctx.fillRect(L+VW-30, 8, 10, 10); ctx.fillRect(L+VW-32, 10, 14, 6); ctx.fillRect(L+VW-28, 6, 6, 14);
+      // 流れる雲
+      ctx.fillStyle='rgba(255,255,255,.85)';
+      for(let i=0;i<3;i++){
+        const cw=[26,18,32][i];
+        const cxx = L + (((t*(2+i)) + i*120) % (VW+60)) - 40;
+        const cyy = 8 + i*9;
+        ctx.fillRect(cxx, cyy+3, cw, 4);
+        ctx.fillRect(cxx+4, cyy, cw-10, 3);
+      }
+      // 海鳥
+      if(Math.floor(t)%7<3){
+        ctx.fillStyle='#3a4a5e';
+        const bx=L+((t*9)%(VW+30))-15, by=16+Math.sin(t*2)*3;
+        ctx.fillRect(bx,by,2,1); ctx.fillRect(bx+3,by,2,1); ctx.fillRect(bx+2,by+1,1,1);
+      }
+    }
+  }
+  for(let z=0; z<ZONES.length; z++){
+    const y0 = z===0? Y_WATER : zoneTopY(z);
+    const y1 = z<ZONES.length-1 ? zoneTopY(z+1) : WORLD_BOTTOM+VH;
+    ctx.fillStyle=ZONES[z].col; ctx.fillRect(L-2,y0,VW+4,y1-y0);
+  }
+  if(night){   // 夜の海:全体をすこし暗く
+    ctx.fillStyle='rgba(4,8,26,.32)';
+    ctx.fillRect(L-2, Math.max(Y_WATER,camY-10), VW+4, VH+20);
+  }
+  // sun rays near surface
+  ctx.fillStyle='rgba(180,230,255,.06)';
+  for(let i=0;i<4;i++){
+    const x=L+((i*53 + Math.sin(t*.3+i)*8)%VW);
+    ctx.beginPath(); ctx.moveTo(x,Y_WATER); ctx.lineTo(x+18,Y_WATER); ctx.lineTo(x+44,Y_WATER+90); ctx.lineTo(x+10,Y_WATER+90); ctx.fill();
+  }
+  // waves
+  ctx.fillStyle='#bfe6f7';
+  for(let x=L-6;x<L+VW+6;x+=6) ctx.fillRect(x, Y_WATER-1 + (((Math.floor(x/6) + (t*4|0))%2+2)%2), 4,1);
+
+  // zone boundary labels
+  ctx.font='7px monospace';
+  for(let z=1; z<ZONES.length; z++){
+    const y=zoneTopY(z);
+    ctx.fillStyle='rgba(120,170,210,.25)';
+    for(let x=L;x<L+VW;x+=8) ctx.fillRect(x,y,4,1);
+    ctx.fillStyle = z<S.zoneUnlocked ? 'rgba(127,231,212,.6)':'rgba(110,150,190,.5)';
+    ctx.fillText(ZONES[z].name + (z<S.zoneUnlocked ? '' : ' - 未解放 -'), L+4, y+8);
+  }
+
+  // ----- marine snow -----
+  for(const p of snow){
+    p.y += p.v; if(p.y>WORLD_BOTTOM) p.y=Y_WATER;
+    if(p.y>camY-4 && p.y<camY+VH+4){
+      ctx.fillStyle='rgba(200,225,255,.35)';
+      ctx.fillRect(Math.floor(p.x*(VW+80))-40, Math.floor(p.y), 1,1);
+    }
+  }
+
+  // ----- station -----
+  const cx=CX();
+  // surface platform
+  ctx.fillStyle='#1d3a5f'; ctx.fillRect(cx-26, Y_WATER-4, 52, 6);
+  ctx.fillStyle='#2d5c8f'; ctx.fillRect(cx-26, Y_WATER-4, 52, 2);
+  ctx.fillStyle='#ffd97a'; ctx.fillRect(cx-22, Y_WATER-8, 3,4); ctx.fillRect(cx+19, Y_WATER-8, 3,4);
+  ctx.fillStyle='#cf4f3e'; ctx.fillRect(cx-3, Y_WATER-11, 6,7);
+  ctx.fillStyle='#fff'; ctx.fillRect(cx-3, Y_WATER-9, 6,1);
+  // antenna blink
+  if(Math.floor(t*2)%2===0){ ctx.fillStyle='#ff6e9c'; ctx.fillRect(cx-1, Y_WATER-13, 2,2); }
+
+  // ===== シャフト(海中エレベーター塔) =====
+  const shaftEnd = ROW0 + S.zoneUnlocked*LVPERZONE*LH;
+  const shTop = Y_WATER;
+  // 内部チューブ(ガラス)
+  ctx.fillStyle='#081220'; ctx.fillRect(cx-5, shTop, 10, shaftEnd-shTop);
+  ctx.fillStyle='rgba(127,231,212,.09)'; ctx.fillRect(cx-3, shTop, 6, shaftEnd-shTop);
+  // 斜めトラス(X字の鉄骨)
+  ctx.strokeStyle='#3f74a8'; ctx.lineWidth=1;
+  ctx.beginPath();
+  for(let y=shTop+4; y<shaftEnd-10; y+=12){
+    ctx.moveTo(cx-5, y);  ctx.lineTo(cx+5, y+10);
+    ctx.moveTo(cx+5, y);  ctx.lineTo(cx-5, y+10);
+  }
+  ctx.stroke();
+  // 外側の支柱フレーム
+  ctx.fillStyle='#2d5c8f'; ctx.fillRect(cx-7, shTop, 2, shaftEnd-shTop); ctx.fillRect(cx+5, shTop, 2, shaftEnd-shTop);
+  ctx.fillStyle='#16344f'; ctx.fillRect(cx-6, shTop, 1, shaftEnd-shTop); ctx.fillRect(cx+6, shTop, 1, shaftEnd-shTop);
+  // 各階の接続フランジ(モジュール取付リング+ボルト)
+  for(let z=0; z<S.zoneUnlocked; z++) for(let l=0; l<LVPERZONE; l++){
+    const fy = rowY(z,l)+10;
+    ctx.fillStyle='#22394f'; ctx.fillRect(cx-9, fy, 18, 4);
+    ctx.fillStyle='#5b8cc0'; ctx.fillRect(cx-9, fy, 18, 1);
+    ctx.fillStyle='#ffd97a'; ctx.fillRect(cx-9, fy+2, 1,1); ctx.fillRect(cx+8, fy+2, 1,1);
+  }
+  // 誘導ランプ(交互に点滅)
+  for(let y=shTop+10; y<shaftEnd-6; y+=24){
+    if(Math.floor(t*1.5 + y/24)%2===0){
+      ctx.fillStyle='#ffb24a'; ctx.fillRect(cx-8, y, 1,2); ctx.fillRect(cx+7, y, 1,2);
+    }
+  }
+  // エレベーターケーブルとゴンドラ(往復運動)
+  const span = Math.max(24, shaftEnd-shTop-20);
+  const ph = (t*10) % (span*2);
+  const ey = shTop+5 + (ph<span ? ph : span*2-ph);
+  ctx.fillStyle='#9fb6c4'; ctx.fillRect(cx, shTop, 1, ey-shTop);   // ケーブル
+  ctx.fillStyle='#b08a2e'; ctx.fillRect(cx-3, ey, 6, 1);           // カゴ屋根
+  ctx.fillStyle='#e8b73a'; ctx.fillRect(cx-3, ey+1, 6, 6);         // カゴ本体
+  ctx.fillStyle='#fff3c8'; ctx.fillRect(cx-2, ey+2, 4, 3);         // 光る窓
+  ctx.fillStyle='#2c2620'; ctx.fillRect(cx-1, ey+2, 1,1);          // 乗客
+  ctx.fillStyle='#cf4f3e'; ctx.fillRect(cx-1, ey+3, 1,2);
+  // 最下部:海底アンカー(基礎+点滅ライト)
+  ctx.fillStyle='#22394f'; ctx.fillRect(cx-10, shaftEnd, 20, 4);
+  ctx.fillStyle='#16344f'; ctx.fillRect(cx-7, shaftEnd+4, 14, 3);
+  ctx.fillStyle='#0c2238'; ctx.fillRect(cx-12, shaftEnd+2, 3, 2); ctx.fillRect(cx+9, shaftEnd+2, 3, 2);
+  if(Math.floor(t*2)%2===0){
+    ctx.fillStyle='#7fe7d4'; ctx.fillRect(cx-10, shaftEnd+1, 1,1); ctx.fillRect(cx+9, shaftEnd+1, 1,1);
+  }
+
+  // 横拡張レール(購入済みスロットまでフレームを延長)
+  for(let z=0; z<S.zoneUnlocked; z++) for(let l=0; l<LVPERZONE; l++){
+    for(const side of [-1,1]){
+      const owned=S.slots.filter(s=>s.zone===z && s.lv===l && s.side===side && s.owned);
+      if(!owned.length) continue;
+      const maxP=Math.max(...owned.map(s=>s.pos));
+      const fy=rowY(z,l)+10;
+      const len=30 + (maxP-1)*32;
+      const x0 = side<0 ? cx-7-len : cx+7;
+      ctx.fillStyle='#22394f'; ctx.fillRect(x0, fy, len, 3);
+      ctx.fillStyle='#5b8cc0'; ctx.fillRect(x0, fy, len, 1);
+    }
+  }
+
+  // slots & buildings
+  const A = assignments();
+  let capI=0, labI=0, tutTarget=null;
+  for(const s of S.slots){
+    if(s.zone>=S.zoneUnlocked) continue;
+    if(s.b==='__ext') continue;   // 大型施設の外側半分(本体側で描画)
+    if(!s.owned){
+      if(slotPurchasable(s)) drawBuySlot(s);
+      continue;
+    }
+    if(!s.b && s.owned && tutReq() && s.zone===0 && !tutTarget){ tutTarget=s; }
+    if(s.b){
+      let cws=null;
+      if(s.b==='cap'){ const c=A.caps[capI++]; cws=c?[c]:null; }
+      else if(s.b==='lab'){ const c=A.labs[labI++]; cws=c?[c]:null; }
+      else if(BTYPES[s.b] && BTYPES[s.b].crew>0) cws=A.staff[slotId(s)];
+      const bsc=bornScale(s);
+      if(bsc!==1){
+        const rr=slotRect(s);
+        ctx.save(); ctx.translate(rr.x+rr.w/2, rr.y+rr.h);
+        ctx.scale(Math.max(.05,bsc), Math.max(.05,bsc));
+        ctx.translate(-(rr.x+rr.w/2), -(rr.y+rr.h));
+        drawBuilding(s, cws);
+        ctx.restore();
+      } else drawBuilding(s, cws);
+      const uf=upFlash(s);
+      if(uf>0){
+        const rr=slotRect(s);
+        ctx.globalAlpha=uf*0.7; ctx.fillStyle='#fff';
+        ctx.fillRect(rr.x, rr.y, (BTYPES[s.b]&&BTYPES[s.b].big)?62:30, rr.h);
+        ctx.globalAlpha=1;
+      }
+    } else drawPlus(s);
+  }
+  // チュートリアル:建てるべき「+」枠を金色リングで誘導
+  if(tutTarget){
+    const r=slotRect(tutTarget);
+    const a=0.5+0.5*Math.sin(t*5);
+    ctx.strokeStyle=`rgba(255,217,122,${0.4+0.6*a})`;
+    ctx.lineWidth=2;
+    ctx.strokeRect(r.x-3, r.y-3, r.w+6, r.h+6);
+    ctx.fillStyle='#ffd97a'; ctx.font='8px sans-serif';
+    ctx.fillText('👆ここをタップ!', r.x-6, r.y-6);
+    ctx.lineWidth=1;
+  }
+  // 未踏深層のバンド(超深海のさらに下)
+  if(S.zoneUnlocked>=4){
+    const abY = rowY(3,2)+46;
+    ctx.fillStyle='rgba(0,0,0,.55)';
+    ctx.fillRect(L-2, abY, VW+4, 60);
+    ctx.fillStyle='#3a3a5a'; ctx.font='8px sans-serif';
+    ctx.fillText('▼ 未踏深層 '+fmt(S.abyss.d)+'m', CX()-34, abY+18);
+    if(S.abyssExp){
+      const p=(Date.now()-S.abyssExp.t0)/(S.abyssExp.dur*1000);
+      ctx.fillStyle='#ffe6a3';
+      ctx.fillRect(CX()-2, abY+8+Math.min(44, p*44), 4, 3);
+    }
+  }
+
+  // ----- submarines -----
+  const dockedN = S.subs - S.exps.length;
+  for(let i=0;i<dockedN;i++){
+    ctx.fillStyle='#e8b73a'; ctx.fillRect(cx+30+i*17, Y_WATER-3, 14,5);
+    ctx.fillStyle='#9fdcff'; ctx.fillRect(cx+40+i*17, Y_WATER-2, 3,3);
+  }
+  S.exps.forEach((e,idx)=>{
+    const prog = Math.min(1,(Date.now()-e.t0)/(e.dur*1000));
+    const dive = prog<.5 ? prog*2 : (1-prog)*2;
+    const targetY = zoneTopY(e.zone) + LVPERZONE*LH*0.5;
+    const sy = Y_WATER+6 + (targetY-Y_WATER-6)*dive;
+    const sx = cx+34 + idx*15 + Math.sin(t*2+idx*2)*2;
+    // headlight
+    const g=ctx.createRadialGradient(sx+8,sy+2,1,sx+8,sy+2,30);
+    g.addColorStop(0,'rgba(255,244,190,.3)'); g.addColorStop(1,'rgba(255,244,190,0)');
+    ctx.fillStyle=g; ctx.fillRect(sx-22,sy-28,60,60);
+    ctx.fillStyle='#e8b73a'; ctx.fillRect(sx-6,sy,14,5);
+    ctx.fillStyle='#b08a2e'; ctx.fillRect(sx-8,sy+1,2,3);
+    ctx.fillStyle='#9fdcff'; ctx.fillRect(sx+4,sy+1,3,3);
+    ctx.fillStyle='#e8b73a'; ctx.fillRect(sx-2,sy-2,5,2);
+    // bubbles
+    if(Math.random()<.3 && bubbles.length<60) bubbles.push({x:sx-9, y:sy+1, v:.25+Math.random()*.2});
+  });
+
+  // ----- ferry & tourists -----
+  const dockX = cx-46, walkY = Y_WATER-13;
+  const isStorm = S.event && S.event.type==='storm';
+  const isTv = S.event && S.event.type==='tv';
+  if(S.started && countB('cap')>0 && !isStorm){
+    if(ferry.state==='away'){ ferry.cool -= (isTv?2.5:1)*(1+0.25*adPow()); if(ferry.cool<=0){ ferry.state='in'; ferry.x=-50; } }
+    else if(ferry.state==='in'){
+      ferry.x+=.45;
+      if(ferry.x>=dockX){
+        ferry.state='dock'; ferry.wait=150;
+        const n=Math.min(Math.min(1+countB('cap')+(isTv?2:0)+Math.min(2,adPow()), 7) + (wkIs('omatsuri')?2:0), 9);
+        addGuests(n);
+        for(let i=0;i<n;i++)
+          tourists.push({x:dockX+2-i*7, y:walkY, st:'walk',
+                         sh:TSHIRT[Math.floor(Math.random()*TSHIRT.length)]});
+      }
+    }
+    else if(ferry.state==='dock'){
+      if(--ferry.wait<=0){
+        ferry.state='out';
+        if(tourists.some(p=>p.st==='wait')) floaters.push({x:dockX, y:walkY-4, txt:'またね～', col:'#9fdcff', life:70});
+        tourists = tourists.filter(p=>p.st!=='wait');   // 待っていた客が乗船
+      }
+    }
+    else if(ferry.state==='out'){ ferry.x-=.45; if(ferry.x<-50){ ferry.state='away'; ferry.cool=350+Math.random()*450; } }
+  }
+  tourists.forEach(p=>{
+    if(p.st==='walk'){
+      p.x+=.3;
+      if(p.x>=cx-3){ p.st='in'; p.hide=300+Math.random()*500;
+        floaters.push({x:cx-2, y:walkY-3, txt:'♪', col:'#9fdcff', life:45}); }
+    } else if(p.st==='in'){
+      if(--p.hide<=0){ p.st='back'; p.x=cx-3;
+        floaters.push({x:cx+3, y:walkY-3, txt:'+G', col:'#ffd97a', life:55}); }
+    } else if(p.st==='back'){
+      p.x-=.3; if(p.x<=dockX+6) p.st='wait';
+    } else if(p.st==='wait' && Math.random()<.004){
+      floaters.push({x:p.x, y:p.y-4, txt:'✦', col:'#ffffff', life:25}); // 記念撮影フラッシュ
+    }
+  });
+  for(const p of tourists){
+    if(p.st==='in') continue;
+    const bob = p.st==='wait' ? Math.floor(t*2)%2 : Math.floor(p.x*1.4)%2;
+    drawPerson(Math.round(p.x), p.y - bob, p.sh);
+  }
+  if(ferry.state!=='away'){
+    const fx=Math.round(ferry.x), fy=Y_WATER-6;
+    ctx.fillStyle='#d8e8f0'; ctx.fillRect(fx-2,fy-4,9,4);
+    ctx.fillStyle='#3f6e8f'; ctx.fillRect(fx-9,fy,22,5);
+    ctx.fillStyle='#9fdcff'; ctx.fillRect(fx,fy-3,2,2); ctx.fillRect(fx+4,fy-3,2,2);
+    if(ferry.state!=='dock'){ ctx.fillStyle='rgba(220,240,255,.5)'; ctx.fillRect(fx+14,fy+3,4,1); }
+  }
+
+  // ----- floaters -----
+  floaters = floaters.filter(f=>f.life>0);
+  ctx.font='7px monospace';
+  for(const f of floaters){
+    f.life--; f.y-=.12;
+    ctx.globalAlpha=Math.min(1, f.life/18);
+    ctx.fillStyle=f.col; ctx.fillText(f.txt, f.x, f.y);
+    ctx.globalAlpha=1;
+  }
+
+  // ----- bubbles -----
+  bubbles = bubbles.filter(b=> b.y > Y_WATER+2);
+  for(const b of bubbles){
+    b.y -= b.v;
+    ctx.fillStyle='rgba(220,240,255,.6)';
+    ctx.fillRect(Math.floor(b.x + Math.sin(b.y*.3)*1.5), Math.floor(b.y), 1,1);
+  }
+
+  // ----- swimmers -----
+  swimmers = swimmers.filter(sw=> sw.x>-30 && sw.x<VW+30);
+  for(const sw of swimmers){
+    sw.x += sw.vx; sw.ph += .05;
+    const yy = sw.y + Math.sin(sw.ph)*3;
+    const s = SPR[sw.c.id];
+    ctx.save();
+    if(sw.vx<0){ ctx.translate(Math.round(sw.x), Math.round(yy)); }
+    else { ctx.translate(Math.round(sw.x)+s.width, Math.round(yy)); ctx.scale(-1,1); }
+    if(sw.c.rare===3){
+      ctx.shadowColor='#7fe7d4'; ctx.shadowBlur=6;
+    }
+    ctx.drawImage(s,0,0);
+    ctx.restore();
+  }
+
+  // ----- event visuals -----
+  if(isStorm){
+    ctx.fillStyle='rgba(8,14,28,.38)'; ctx.fillRect(L,camY,VW,VH);
+    if(camY < Y_WATER){                          // 空が見えていれば雨
+      ctx.strokeStyle='rgba(180,210,240,.55)'; ctx.lineWidth=1;
+      ctx.beginPath();
+      for(let i=0;i<26;i++){
+        const rx=L+((i*37 + Math.floor(t*70))%VW);
+        const ry=camY + ((i*53 + t*90) % Math.max(8, Y_WATER-camY+4));
+        if(ry < Y_WATER){ ctx.moveTo(rx,ry); ctx.lineTo(rx-2,ry+4); }
+      }
+      ctx.stroke();
+    }
+    if(Math.random()<.012){ ctx.fillStyle='rgba(255,255,255,.45)'; ctx.fillRect(L,camY,VW,VH); }
+  }
+  if(isTv){
+    drawPerson(cx+13, Y_WATER-13, '#f0f0f0');    // レポーター
+    ctx.fillStyle='#1c1c1c'; ctx.fillRect(cx+19, Y_WATER-12, 4,3);
+    ctx.fillStyle='#ff5a6e'; if(Math.floor(t*2)%2===0) ctx.fillRect(cx+22, Y_WATER-13, 1,1);
+    if(Math.random()<.03) floaters.push({x:cx+8+Math.random()*12, y:Y_WATER-17, txt:'✦', col:'#ffffff', life:16});
+  }
+  if(S.event && S.event.type==='jelly'){          // クラゲの大群がただよう
+    const ks=SPR['kurage'];
+    for(let i=0;i<9;i++){
+      const jx=L+((i*47 + t*5 + Math.sin(t*.6+i)*9)%(VW+20))-10;
+      const jy=Y_WATER+8 + (i*37)%150 + Math.sin(t*.8+i*1.3)*4;
+      ctx.globalAlpha=.8;
+      ctx.drawImage(ks, Math.round(jx), Math.round(jy));
+      ctx.globalAlpha=1;
+    }
+  }
+  if(S.event && S.event.type==='break'){          // 故障中ラボに「!」
+    if(Math.floor(t*2)%2===0){
+      ctx.fillStyle='#ff6e9c'; ctx.font='8px monospace';
+      for(const s of S.slots){
+        if(s.b==='lab' && s.zone<S.zoneUnlocked){
+          const r=slotRect(s);
+          ctx.fillText('!', r.x+r.w/2-2, r.y-2);
+        }
+      }
+    }
+  }
+
+  // depth indicator
+  $('depthTag').textContent = 'すいしん ' + fmt(Math.max(0,(camY+VH/2-Y_WATER))*6) + 'm';
+
+  // expedition done? (モーダル重複を避けるため1フレーム1件)
+  const doneIdx = S.exps.findIndex(e=> Date.now() > e.t0 + e.dur*1000);
+  if(doneIdx>=0) resolveExp(doneIdx);
+  fxDraw(ctx, 1/60);
+
+  requestAnimationFrame(draw);
+}
+
+// ---------- start ----------
+let pendingAway=null, wantSound=false, freshGame=true;
+(function boot(){
+  const d=loadPersist();
+  if(d && d.started){
+    applySave(d);
+    pendingAway = computeAway(d.t);
+    wantSound = !!d.sound;
+    freshGame = false;
+    $('startBtn').textContent='つづきから';
+  } else {
+    S.crew.push(genCrew(1), genCrew(1));   // 新米クルー2名からスタート
+  }
+  asgDirty=true;
+})();
+$('startBtn').onclick=()=>{
+  $('intro').style.display='none';
+  S.started=true; refreshHud();
+  if(wantSound) setSound(true);
+  let awayShown=false;
+  if(pendingAway){
+    const aw=pendingAway; pendingAway=null; awayShown=true;
+    S.g+=aw.g; S.r+=aw.r; refreshHud();
+    const h=Math.floor(aw.el/3600), mn=Math.floor((aw.el%3600)/60);
+    $('awayTx').innerHTML=`るすにしていた ${h>0? h+'時間':''}${mn}分のあいだに…<br>`+
+      `<b style="color:#ffd97a">+${fmt(aw.g)}G</b>　<b style="color:#7fe7d4">研究+${fmt(aw.r)}pt</b><br>`+
+      `<span style="font-size:11px;color:#6fa3d0">(稼働率${Math.round((aw.eff||0.5)*100)}%・最大8時間ぶん)</span>`;
+    $('awayModal').classList.add('open');
+  }
+  if(freshGame){
+    toast('まずはシャフト横の「+」をタップ!');
+    setTimeout(()=>toast('潜水艇で生物を探しに行こう'), 3200);
+    setTimeout(()=>toast('おカネが貯まったらクルーをガチャでスカウト!'), 6400);
+    setTimeout(checkLogin, 1200);
+  } else {
+    toast('ステーションへおかえりなさい!');
+    if(!awayShown) checkLogin();
+  }
+};
+refreshHud();
+requestAnimationFrame(draw);
+
+// ---------- PWA:Service Worker登録 ----------
+(function(){
+  try{
+    if(typeof navigator!=='undefined' && 'serviceWorker' in navigator && /^https?:/.test(location.protocol)){
+      window.addEventListener('load', ()=> navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+    }
+  }catch(e){ /* 単一HTML(file://)やテスト環境では何もしない */ }
+})();
+</script>
+</body>
+</html>
